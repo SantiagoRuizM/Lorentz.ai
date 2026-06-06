@@ -171,7 +171,10 @@ function GraphScreen() {
                 <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{node.label}</span>
                 <span style={{ width: 5, height: 5, background: MOD_COLOR[node.module] || 'var(--border)', flexShrink: 0, marginTop: 3 }} />
               </div>
-              <div style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-dim)' }}>{node.hash}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-dim)' }}>
+                <span>{node.hash}</span>
+                <span style={{ color: 'var(--success)', fontSize: 8, fontWeight: 600 }}>✓ AXIOM L2</span>
+              </div>
             </div>
           ))}
         </div>

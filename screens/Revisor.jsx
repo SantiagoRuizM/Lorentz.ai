@@ -203,6 +203,61 @@ function StudentProfile({ student }) {
   const [hashes, setHashes] = useState([]);
   const [reviewNote, setReviewNote] = useState('');
   const [submitted, setSubmitted]   = useState(false);
+  const [loadingSeal, setLoadingSeal] = useState(false);
+
+  const handleVerifyEvidence = (eventId, dispute) => {
+    fetch('/api/blockchain/verify-evidence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        evidence_id: eventId,
+        reviewer: "Reviewer L2",
+        dispute: dispute
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          // Refresh hashes list
+          fetch(`/api/revisor/hashes/${student.id}`)
+            .then(res => res.json())
+            .then(hashesData => { if (Array.isArray(hashesData)) setHashes(hashesData); });
+        } else {
+          alert("Error al procesar la evidencia.");
+        }
+      })
+      .catch(err => console.error(err));
+  };
+
+  const handleSealReview = () => {
+    if (!reviewNote.trim()) return;
+    setLoadingSeal(true);
+    fetch('/api/axiom/mine', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: student.id })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setLoadingSeal(false);
+        if (data.success) {
+          setSubmitted(true);
+          student.verified = true;
+          student.lastBlock = data.block;
+          // Refresh hashes list
+          fetch(`/api/revisor/hashes/${student.id}`)
+            .then(res => res.json())
+            .then(hashesData => { if (Array.isArray(hashesData)) setHashes(hashesData); });
+        } else {
+          alert("Error: " + (data.error || "No se pudo sellar la revisión."));
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        setLoadingSeal(false);
+        alert("Error de conexión.");
+      });
+  };
 
   useEffect(() => {
     fetch(`/api/revisor/hashes/${student.id}`)
@@ -276,11 +331,68 @@ function StudentProfile({ student }) {
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', padding: 'var(--s3)' }}>
         <span className="label" style={{ display: 'block', marginBottom: 10 }}>REGISTRO EN AXIOM L2</span>
         {hashes.length > 0 ? hashes.map((h, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '70px 120px 80px 1fr', gap: 8, padding: '7px 0', borderBottom: '1px solid var(--border-subtle)', alignItems: 'center', animation: `slideIn 0.15s ${i * 0.05}s ease both` }}>
-            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--violet-bright)' }}>#{h.block}</span>
-            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: MOD_COLOR[h.module] }}>{h.type}</span>
-            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-dim)' }}>{h.ts}</span>
-            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.hash}</span>
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 0', borderBottom: '1px solid var(--border-subtle)', animation: `slideIn 0.15s ${i * 0.05}s ease both` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--violet-bright)' }}>Bloque #{h.block}</span>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: MOD_COLOR[h.module] || 'var(--text-muted)' }}>{h.type}</span>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-dim)' }}>{h.ts}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>{h.hash}</span>
+              
+              {/* Evidence controls */}
+              {h.type === 'EVIDENCE_SUBMITTED' && (() => {
+                let p = {};
+                try { p = JSON.parse(h.payload); } catch(e){}
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono' }}>
+                      BKU-{p.bkuId} ({p.score}/100)
+                    </span>
+                    {p.verified ? (
+                      <span style={{ fontSize: 9, color: 'var(--success)', fontFamily: 'JetBrains Mono', background: 'rgba(78,236,170,0.08)', padding: '1px 5px', border: '1px solid rgba(78,236,170,0.15)' }}>✓ VERIFICADO</span>
+                    ) : p.disputed ? (
+                      <span style={{ fontSize: 9, color: 'var(--error)', fontFamily: 'JetBrains Mono', background: 'rgba(255,92,92,0.08)', padding: '1px 5px', border: '1px solid rgba(255,92,92,0.15)' }}>✗ DISPUTADO</span>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button 
+                          onClick={() => handleVerifyEvidence(h.id, false)}
+                          style={{ background: 'var(--success)', border: 'none', padding: '2px 5px', fontSize: 9, fontWeight: 700, color: 'var(--void)', cursor: 'pointer', borderRadius: '1px' }}
+                        >
+                          Aprobar
+                        </button>
+                        <button 
+                          onClick={() => handleVerifyEvidence(h.id, true)}
+                          style={{ background: 'var(--error)', border: 'none', padding: '2px 5px', fontSize: 9, fontWeight: 700, color: 'white', cursor: 'pointer', borderRadius: '1px' }}
+                        >
+                          Disputar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {h.type === 'AKU_GRANTED' && (() => {
+                let p = {};
+                try { p = JSON.parse(h.payload); } catch(e){}
+                return (
+                  <span style={{ fontSize: 9, color: 'var(--warn)', fontFamily: 'JetBrains Mono', background: 'rgba(255,184,77,0.08)', padding: '1px 5px', border: '1px solid rgba(255,184,77,0.15)' }}>
+                    SBT MINTED: {p.akuName} {p.sbtTokenId}
+                  </span>
+                );
+              })()}
+
+              {h.type === 'CERTIFICATION_GRANTED' && (() => {
+                let p = {};
+                try { p = JSON.parse(h.payload); } catch(e){}
+                return (
+                  <span style={{ fontSize: 9, color: 'var(--success)', fontFamily: 'JetBrains Mono', background: 'rgba(78,236,170,0.08)', padding: '1px 5px', border: '1px solid rgba(78,236,170,0.15)' }}>
+                    CERT MINTED: {p.certName} {p.sbtTokenId}
+                  </span>
+                );
+              })()}
+            </div>
           </div>
         )) : (
           <div style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-dim)' }}>No hay registros disponibles.</div>
@@ -308,9 +420,12 @@ function StudentProfile({ student }) {
               onBlur={e => e.target.style.borderColor = 'var(--border)'}
             />
             <button
-              onClick={() => { if (reviewNote.trim()) setSubmitted(true); }}
-              style={{ width: '100%', padding: '8px', background: 'var(--violet)', border: 'none', borderRadius: '2px', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '2px 2px 0 var(--violet-deep)' }}
-            >Sellar revisión en L2 →</button>
+              onClick={handleSealReview}
+              disabled={loadingSeal}
+              style={{ width: '100%', padding: '8px', background: 'var(--violet)', border: 'none', borderRadius: '2px', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '2px 2px 0 var(--violet-deep)', opacity: loadingSeal ? 0.7 : 1 }}
+            >
+              {loadingSeal ? 'Sellando bloque...' : 'Sellar revisión en L2 →'}
+            </button>
           </>
         )}
       </div>
