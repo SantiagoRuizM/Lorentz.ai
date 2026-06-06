@@ -51,6 +51,11 @@ const TYPE_COLORS = {
   DIVERGENCIA:   'var(--violet)',
   NOTA_PROFESOR: '#60A5FA',
   REVISION_L2:   '#A78BFA',
+  EVIDENCE_SUBMITTED: '#FFB84D',
+  EVIDENCE_VERIFIED:  '#4DECAA',
+  EVIDENCE_DISPUTED:  '#FF5C5C',
+  AKU_GRANTED:        '#9B8AFF',
+  CERTIFICATION_GRANTED: '#00D8F6',
 };
 
 // ── Mini mempool ──────────────────────────────────────────────────

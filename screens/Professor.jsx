@@ -180,6 +180,50 @@ function StudentDetail({ student, onBack }) {
   const [gEdges, setGEdges] = useState([]);
   const graphRef = useRef(null);
 
+  // Blockchain Evidence Submission State
+  const [bkuId, setBkuId] = useState(101);
+  const [scoreVal, setScoreVal] = useState(90);
+  const [noteText, setNoteText] = useState('');
+  const [loadingL2, setLoadingL2] = useState(false);
+  const [txResult, setTxResult] = useState(null);
+
+  const handleRegisterL2 = () => {
+    if (!noteText.trim()) {
+      alert("Por favor escribe una anotación.");
+      return;
+    }
+    setLoadingL2(true);
+    setTxResult(null);
+    fetch('/api/blockchain/submit-evidence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: student.id,
+        bku_id: bkuId,
+        score: scoreVal,
+        note: noteText,
+        professor: "Profesor Lorentz"
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setLoadingL2(false);
+        if (data.success) {
+          setTxResult(data);
+          setNoteText('');
+          // Clear notification after 4 seconds
+          setTimeout(() => setTxResult(null), 4000);
+        } else {
+          alert("Error: " + (data.error || "No se pudo registrar la evidencia."));
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        setLoadingL2(false);
+        alert("Error de conexión al servidor.");
+      });
+  };
+
   useEffect(() => {
     const obs = new ResizeObserver(entries => {
       for (const e of entries) { setGraphW(e.contentRect.width); setGraphH(e.contentRect.height); }
@@ -320,25 +364,95 @@ function StudentDetail({ student, onBack }) {
               </div>
             </div>
           </>
-        ) : (
           /* Notes tab */
           <div style={{ flex: 1, padding: 'var(--s4)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
             <GaussianWidget highlighted={student.score} />
             <div style={{ background: 'var(--card)', border: '1px solid var(--border)', padding: 'var(--s3)' }}>
-              <span className="label" style={{ display: 'block', marginBottom: 10 }}>NOTA DEL PROFESOR</span>
-              <textarea placeholder={`Escribe una anotación sobre ${student.name}… (se hasheará en Axiom L2)`} rows={5} style={{
-                width: '100%', background: 'var(--slate)', border: '1px solid var(--border)',
-                borderRadius: '2px', padding: '10px', color: 'var(--text)', fontSize: 13, fontFamily: 'DM Sans',
-                outline: 'none', resize: 'vertical', lineHeight: 1.6,
-              }} onFocus={e => e.target.style.borderColor = 'var(--violet)'} onBlur={e => e.target.style.borderColor = 'var(--border)'} />
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button style={{ flex: 1, padding: '8px', background: 'var(--violet)', border: 'none', borderRadius: '2px', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: '2px 2px 0 var(--violet-deep)' }}>
-                  Registrar en L2 →
-                </button>
-                <button style={{ padding: '8px 14px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '2px', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>
-                  Guardar borrador
+              <span className="label" style={{ display: 'block', marginBottom: 12 }}>EVALUACIÓN Y EVIDENCIA DE APRENDIZAJE</span>
+              
+              {/* BKU Selector */}
+              <div style={{ marginBottom: 12 }}>
+                <label className="label" style={{ display: 'block', marginBottom: 5 }}>Unidad Mínima de Conocimiento (BKU)</label>
+                <select 
+                  value={bkuId} 
+                  onChange={e => setBkuId(Number(e.target.value))}
+                  style={{
+                    width: '100%', background: 'var(--slate)', border: '1px solid var(--border)',
+                    borderRadius: '2px', padding: '8px 12px', color: 'var(--text)', fontSize: 13,
+                    fontFamily: 'DM Sans', outline: 'none'
+                  }}
+                >
+                  <option value={101}>BKU-101: Dilatación del Tiempo (Peso: 10)</option>
+                  <option value={102}>BKU-102: Contracción de Lorentz (Peso: 15)</option>
+                  <option value={103}>BKU-103: Espacio-tiempo de Minkowski (Peso: 20)</option>
+                  <option value={104}>BKU-104: Métrica η_μν (Peso: 15)</option>
+                  <option value={105}>BKU-105: Conos de Luz y Causalidad (Peso: 20)</option>
+                </select>
+              </div>
+
+              {/* Score Range */}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                  <label className="label">Calificación de la Actividad</label>
+                  <span style={{ fontFamily: 'JetBrains Mono', color: 'var(--success)', fontWeight: 'bold' }}>{scoreVal}/100</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="100" 
+                  value={scoreVal} 
+                  onChange={e => setScoreVal(Number(e.target.value))}
+                  style={{ width: '100%', accentColor: 'var(--violet)' }}
+                />
+              </div>
+
+              {/* Textarea */}
+              <div style={{ marginBottom: 12 }}>
+                <label className="label" style={{ display: 'block', marginBottom: 5 }}>Observaciones Pedagógicas</label>
+                <textarea 
+                  placeholder={`Escribe una anotación sobre ${student.name}… (se hasheará y registrará como evidencia L2)`} 
+                  rows={4} 
+                  value={noteText}
+                  onChange={e => setNoteText(e.target.value)}
+                  style={{
+                    width: '100%', background: 'var(--slate)', border: '1px solid var(--border)',
+                    borderRadius: '2px', padding: '10px', color: 'var(--text)', fontSize: 13, fontFamily: 'DM Sans',
+                    outline: 'none', resize: 'vertical', lineHeight: 1.6,
+                  }} 
+                  onFocus={e => e.target.style.borderColor = 'var(--violet)'} 
+                  onBlur={e => e.target.style.borderColor = 'var(--border)'} 
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button 
+                  onClick={handleRegisterL2}
+                  disabled={loadingL2}
+                  style={{ 
+                    flex: 1, padding: '10px', background: 'var(--violet)', border: 'none', 
+                    borderRadius: '2px', color: 'white', fontSize: 12, fontWeight: 700, 
+                    cursor: 'pointer', boxShadow: '2px 2px 0 var(--violet-deep)',
+                    opacity: loadingL2 ? 0.7 : 1
+                  }}
+                >
+                  {loadingL2 ? 'Registrando en L2...' : 'Registrar en L2 (Axiom Ledger) →'}
                 </button>
               </div>
+
+              {/* Success Feedback */}
+              {txResult && (
+                <div style={{
+                  marginTop: 12, padding: 12, background: 'rgba(78,236,170,0.06)',
+                  border: '1px solid rgba(78,236,170,0.2)', fontFamily: 'JetBrains Mono', fontSize: 11
+                }}>
+                  <div style={{ color: 'var(--success)', fontWeight: 'bold', marginBottom: 4 }}>✓ ¡Evidencia Registrada en Blockchain!</div>
+                  <div style={{ color: 'var(--text-muted)' }}>Bloque: #{txResult.block}</div>
+                  <div style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    Tx Hash: <span style={{ color: 'var(--violet-bright)' }}>{txResult.hash}</span>
+                  </div>
+                </div>
+              )}
             </div>
             <div style={{ background: 'var(--card)', border: '1px solid var(--border)', padding: 'var(--s3)' }}>
               <span className="label" style={{ display: 'block', marginBottom: 10 }}>CALIFICACIÓN MANUAL</span>

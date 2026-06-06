@@ -44,6 +44,19 @@ def init_db():
         lastBlock INTEGER NOT NULL DEFAULT 1247835
     )""")
 
+    try:
+        cursor.execute("ALTER TABLE students ADD COLUMN knowledgeScore INTEGER DEFAULT 0")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE students ADD COLUMN reputationScore INTEGER DEFAULT 0")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE students ADD COLUMN consistencyScore INTEGER DEFAULT 0")
+    except Exception:
+        pass
+
     # Chat Messages Table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS chat_messages (
@@ -347,6 +360,187 @@ def init_db():
 
         conn.commit()
     conn.close()
+
+# ── Blockchain Layer & Reputation Catalog ──
+
+KNOWLEDGE_CATALOG = {
+    "bkus": [
+        {"id": 101, "name": "Dilatación del Tiempo", "weight": 10, "area": "Relatividad", "level": 1},
+        {"id": 102, "name": "Contracción de Lorentz", "weight": 15, "area": "Relatividad", "level": 1},
+        {"id": 103, "name": "Espacio-tiempo de Minkowski", "weight": 20, "area": "Geometría", "level": 1},
+        {"id": 104, "name": "Métrica η_μν", "weight": 15, "area": "Geometría", "level": 1},
+        {"id": 105, "name": "Conos de Luz y Causalidad", "weight": 20, "area": "Geometría", "level": 1}
+    ],
+    "akus": [
+        {"id": 201, "name": "Relatividad Especial Básica", "requiredBKUs": [101, 102, 103], "minCompletionPercentage": 66},
+        {"id": 202, "name": "Geometría del Espacio-Tiempo", "requiredBKUs": [103, 104, 105], "minCompletionPercentage": 66}
+    ],
+    "certifications": [
+        {"id": 301, "name": "Máster en Relatividad de Lorentz", "requiredAKUs": [201, 202]}
+    ]
+}
+
+def compute_student_reputation(cursor, student_id):
+    # Fetch all verified evidence events for this student
+    cursor.execute("""
+        SELECT payload FROM axiom_events 
+        WHERE student = ? AND type = 'EVIDENCE_SUBMITTED'
+    """, (student_id,))
+    
+    completed_bku_ids = []
+    weighted_score_sum = 0
+    total_weight = 0
+    
+    for row in cursor.fetchall():
+        payload = json.loads(row["payload"])
+        # Only count verified and not disputed evidence
+        if payload.get("verified") and not payload.get("disputed"):
+            bku_id = payload.get("bkuId")
+            score = payload.get("score", 0)
+            completed_bku_ids.append(bku_id)
+            
+            # Find weight of BKU
+            bku = next((b for b in KNOWLEDGE_CATALOG["bkus"] if b["id"] == bku_id), None)
+            if bku:
+                weight = bku["weight"]
+                weighted_score_sum += (score * weight)
+                total_weight += weight
+
+    # Knowledge Score: Sum of weights of completed BKUs + bonus for AKUs and Certifications
+    k_score = sum(next((b["weight"] for b in KNOWLEDGE_CATALOG["bkus"] if b["id"] == bid), 0) for bid in completed_bku_ids)
+    
+    # Check obtained AKUs/Certs from ledger events
+    cursor.execute("""
+        SELECT type, payload FROM axiom_events 
+        WHERE student = ? AND type IN ('AKU_GRANTED', 'CERTIFICATION_GRANTED')
+    """, (student_id,))
+    
+    aku_count = 0
+    cert_count = 0
+    for row in cursor.fetchall():
+        if row["type"] == 'AKU_GRANTED':
+            aku_count += 1
+        elif row["type"] == 'CERTIFICATION_GRANTED':
+            cert_count += 1
+            
+    k_score += (aku_count * 50)
+    k_score += (cert_count * 200)
+
+    # Reputation Score
+    rep_score = 0
+    if total_weight > 0:
+        rep_score = int(weighted_score_sum / total_weight) * 10
+        rep_score += (aku_count * 15) + (cert_count * 40)
+    else:
+        # Fallback if no verified BKUs yet
+        cursor.execute("SELECT score FROM students WHERE id = ?", (student_id,))
+        s_row = cursor.fetchone()
+        if s_row:
+            rep_score = s_row["score"] * 10
+
+    # Consistency Score: Completed BKUs / Total BKUs
+    total_bkus = len(KNOWLEDGE_CATALOG["bkus"])
+    const_score = int((len(completed_bku_ids) * 100) / total_bkus) if total_bkus > 0 else 0
+    if const_score == 0:
+        const_score = 45 # default starting consistency score for active users
+
+    cursor.execute("""
+        UPDATE students 
+        SET knowledgeScore = ?, reputationScore = ?, consistencyScore = ?
+        WHERE id = ?
+    """, (k_score, rep_score, const_score, student_id))
+
+def check_achievements_and_mint_sbts(cursor, student_id, reviewer):
+    # Fetch all verified, completed BKU IDs
+    cursor.execute("""
+        SELECT payload FROM axiom_events 
+        WHERE student = ? AND type = 'EVIDENCE_SUBMITTED'
+    """, (student_id,))
+    
+    completed_bkus = set()
+    for row in cursor.fetchall():
+        payload = json.loads(row["payload"])
+        if payload.get("verified") and not payload.get("disputed"):
+            completed_bkus.add(payload.get("bkuId"))
+
+    # Fetch currently unlocked AKUs to prevent double granting
+    cursor.execute("""
+        SELECT type, payload FROM axiom_events 
+        WHERE student = ? AND type = 'AKU_GRANTED'
+    """, (student_id,))
+    granted_akus = set()
+    for row in cursor.fetchall():
+        granted_akus.add(json.loads(row["payload"]).get("akuId"))
+
+    new_grants = []
+
+    # Check AKUs
+    for aku in KNOWLEDGE_CATALOG["akus"]:
+        aku_id = aku["id"]
+        if aku_id in granted_akus:
+            continue
+            
+        reqs = aku["requiredBKUs"]
+        completed_reqs = [r for r in reqs if r in completed_bkus]
+        achieved_pct = int((len(completed_reqs) * 100) / len(reqs)) if len(reqs) > 0 else 0
+        
+        if achieved_pct >= aku["minCompletionPercentage"]:
+            # Grant AKU! Add to axiom_events ledger
+            cursor.execute("SELECT MAX(block) FROM axiom_events")
+            max_block = cursor.fetchone()[0] or 1247835
+            new_block = max_block + 1
+            
+            h = hashlib.sha256(f"aku_{aku_id}_{student_id}_{time.time()}".encode()).hexdigest()[:12]
+            
+            cursor.execute("""
+                INSERT INTO axiom_events (id, block, ts, type, module, student, hash, payload)
+                VALUES (?, ?, 'Ahora', 'AKU_GRANTED', 'axiom', ?, ?, ?)
+            """, (f"aku_{new_block}", new_block, student_id, f"0x{h}", json.dumps({
+                "akuId": aku_id,
+                "akuName": aku["name"],
+                "evidence_refs": [f"ev_{r}" for r in completed_reqs],
+                "sbtTokenId": f"#{2000 + aku_id}"
+            })))
+            new_grants.append({"type": "aku", "id": aku_id, "name": aku["name"]})
+            granted_akus.add(aku_id)
+
+    # Fetch currently unlocked Certifications
+    cursor.execute("""
+        SELECT type, payload FROM axiom_events 
+        WHERE student = ? AND type = 'CERTIFICATION_GRANTED'
+    """, (student_id,))
+    granted_certs = set()
+    for row in cursor.fetchall():
+        granted_certs.add(json.loads(row["payload"]).get("certId"))
+
+    # Check Certifications
+    for cert in KNOWLEDGE_CATALOG["certifications"]:
+        cert_id = cert["id"]
+        if cert_id in granted_certs:
+            continue
+            
+        reqs = cert["requiredAKUs"]
+        all_completed = all(r in granted_akus for r in reqs)
+        
+        if all_completed:
+            # Grant Certification! Add to axiom_events ledger
+            cursor.execute("SELECT MAX(block) FROM axiom_events")
+            max_block = cursor.fetchone()[0] or 1247835
+            new_block = max_block + 1
+            
+            h = hashlib.sha256(f"cert_{cert_id}_{student_id}_{time.time()}".encode()).hexdigest()[:12]
+            
+            cursor.execute("""
+                INSERT INTO axiom_events (id, block, ts, type, module, student, hash, payload)
+                VALUES (?, ?, 'Ahora', 'CERTIFICATION_GRANTED', 'axiom', ?, ?, ?)
+            """, (f"cert_{new_block}", new_block, student_id, f"0x{h}", json.dumps({
+                "certId": cert_id,
+                "certName": cert["name"],
+                "sbtTokenId": f"#{3000 + cert_id}"
+            })))
+            new_grants.append({"type": "cert", "id": cert_id, "name": cert["name"]})
+
+    return new_grants
 
 # ── API Logic ──
 
@@ -774,6 +968,146 @@ def handle_api(path, method, body_data):
                 response_data = {"found": True, "event": dict(row)}
             else:
                 response_data = {"found": False}
+
+        elif route == "/api/blockchain/catalog" and method == "GET":
+            response_data = KNOWLEDGE_CATALOG
+
+        elif route == "/api/blockchain/submit-evidence" and method == "POST":
+            payload = json.loads(body_data) if body_data else {}
+            student_id = payload.get("student_id", "JD")
+            bku_id = int(payload.get("bku_id", 101))
+            score = int(payload.get("score", 90))
+            note = payload.get("note", "")
+            professor = payload.get("professor", "Profesor Asignado")
+
+            # Check if this BKU exists
+            bku = next((b for b in KNOWLEDGE_CATALOG["bkus"] if b["id"] == bku_id), None)
+            if not bku:
+                status_code = 400
+                response_data = {"error": f"BKU-ID {bku_id} no existe en el catálogo."}
+            else:
+                cursor.execute("SELECT MAX(block) FROM axiom_events")
+                max_block = cursor.fetchone()[0] or 1247835
+                new_block = max_block + 1
+                
+                # Create hash of the evidence
+                evidence_content = f"{student_id}_{bku_id}_{score}_{note}_{time.time()}"
+                h = hashlib.sha256(evidence_content.encode()).hexdigest()[:12]
+                evt_id = f"ev_{new_block}"
+                
+                # Insert event EVIDENCE_SUBMITTED (unverified evidence)
+                cursor.execute("""
+                    INSERT INTO axiom_events (id, block, ts, type, module, student, hash, payload)
+                    VALUES (?, ?, 'Ahora', 'EVIDENCE_SUBMITTED', 'synaptrac', ?, ?, ?)
+                """, (evt_id, new_block, student_id, f"0x{h}", json.dumps({
+                    "bkuId": bku_id,
+                    "bkuName": bku["name"],
+                    "score": score,
+                    "note": note,
+                    "professor": professor,
+                    "verified": False,
+                    "disputed": False
+                })))
+                
+                # Compute reputation scores
+                compute_student_reputation(cursor, student_id)
+                
+                # Update student last Block/Hash
+                cursor.execute("UPDATE students SET lastBlock = ?, lastHash = ? WHERE id = ?", (new_block, f"0x{h}", student_id))
+                
+                conn.commit()
+                response_data = {
+                    "success": True, 
+                    "block": new_block, 
+                    "hash": f"0x{h}", 
+                    "evidence_id": evt_id
+                }
+
+        elif route == "/api/blockchain/verify-evidence" and method == "POST":
+            payload = json.loads(body_data) if body_data else {}
+            evidence_id = payload.get("evidence_id", "")
+            reviewer = payload.get("reviewer", "Auditor L2")
+            dispute = payload.get("dispute", False)
+
+            cursor.execute("SELECT id, block, student, hash, payload FROM axiom_events WHERE id = ?", (evidence_id,))
+            row = cursor.fetchone()
+            if not row:
+                status_code = 404
+                response_data = {"error": "Evidence not found"}
+            else:
+                student_id = row["student"]
+                old_payload = json.loads(row["payload"])
+                
+                cursor.execute("SELECT MAX(block) FROM axiom_events")
+                max_block = cursor.fetchone()[0] or 1247835
+                new_block = max_block + 1
+                
+                h = hashlib.sha256(f"verify_{evidence_id}_{reviewer}_{time.time()}".encode()).hexdigest()[:12]
+                
+                if dispute:
+                    old_payload["disputed"] = True
+                    old_payload["verified"] = False
+                    new_type = "EVIDENCE_DISPUTED"
+                else:
+                    old_payload["verified"] = True
+                    old_payload["disputed"] = False
+                    new_type = "EVIDENCE_VERIFIED"
+                
+                old_payload["reviewer"] = reviewer
+                
+                # Update the original evidence event payload to reflect status
+                cursor.execute("""
+                    UPDATE axiom_events 
+                    SET payload = ? 
+                    WHERE id = ?
+                """, (json.dumps(old_payload), evidence_id))
+                
+                # Insert verification event in the ledger
+                cursor.execute("""
+                    INSERT INTO axiom_events (id, block, ts, type, module, student, hash, payload)
+                    VALUES (?, ?, 'Ahora', ?, 'revisor', ?, ?, ?)
+                """, (f"v_{new_block}", new_block, new_type, student_id, f"0x{h}", json.dumps({
+                    "evidence_ref": evidence_id,
+                    "reviewer": reviewer,
+                    "bkuId": old_payload.get("bkuId")
+                })))
+                
+                # Trigger achievement checks
+                new_achievements = check_achievements_and_mint_sbts(cursor, student_id, reviewer)
+                
+                # Compute reputation
+                compute_student_reputation(cursor, student_id)
+                
+                cursor.execute("UPDATE students SET lastBlock = ? WHERE id = ?", (new_block, student_id))
+                conn.commit()
+                
+                response_data = {
+                    "success": True, 
+                    "block": new_block, 
+                    "hash": f"0x{h}",
+                    "new_achievements": new_achievements
+                }
+
+        elif route == "/api/blockchain/student-reputation" and method == "GET":
+            student_id = query.get("student_id", ["JD"])[0]
+            cursor.execute("""
+                SELECT knowledgeScore, reputationScore, consistencyScore, score 
+                FROM students 
+                WHERE id = ?
+            """, (student_id,))
+            row = cursor.fetchone()
+            if row:
+                d = dict(row)
+                # Ensure scores are initialized if they were 0
+                if not d.get("knowledgeScore") or d.get("knowledgeScore") == 0:
+                    d["knowledgeScore"] = 45
+                if not d.get("reputationScore") or d.get("reputationScore") == 0:
+                    d["reputationScore"] = d["score"] * 10
+                if not d.get("consistencyScore") or d.get("consistencyScore") == 0:
+                    d["consistencyScore"] = 72
+                response_data = d
+            else:
+                response_data = {"knowledgeScore": 45, "reputationScore": 870, "consistencyScore": 72}
 
         else:
             status_code = 404

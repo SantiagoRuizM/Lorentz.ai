@@ -96,10 +96,23 @@ function AchievementsScreen({ role, walletAddress, walletBalance, setWalletBalan
   const [signing, setSigning] = useState(false);
   const [successAnim, setSuccessAnim] = useState(false);
 
-  // Sync data if role changes
+  // L2 Reputation Engine Scores
+  const [repScores, setRepScores] = useState({ knowledgeScore: 45, reputationScore: 870, consistencyScore: 72 });
+
+  // Sync data if role changes or wallet updates
   useEffect(() => {
     setData(ROLE_ACHIEVEMENTS[role] || ROLE_ACHIEVEMENTS.estudiante);
-  }, [role]);
+    
+    // Fetch live reputation scores
+    fetch(`/api/blockchain/student-reputation?student_id=JD`)
+      .then(res => res.json())
+      .then(d => {
+        if (d && !d.error) {
+          setRepScores(d);
+        }
+      })
+      .catch(err => console.log('Err fetching student reputation:', err));
+  }, [role, walletAddress]);
 
   const triggerMint = (cert) => {
     if (!walletAddress) {
@@ -186,45 +199,44 @@ function AchievementsScreen({ role, walletAddress, walletBalance, setWalletBalan
 
       {/* Progress Cards Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--s3)', marginBottom: 'var(--s4)' }}>
-        {/* Score */}
+        {/* Reputation Score */}
         <div style={{ background: 'var(--deep)', border: '1px solid var(--border)', padding: 'var(--s3)', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', bottom: -10, right: -10, fontSize: 80, opacity: 0.04, userSelect: 'none' }}>🏆</div>
-          <h4 style={{ fontSize: 11, fontFamily: 'JetBrains Mono', color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Puntaje Académico Lorentz</h4>
+          <h4 style={{ fontSize: 11, fontFamily: 'JetBrains Mono', color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Reputation Score (On-Chain)</h4>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontSize: 32, fontWeight: 800, color: 'var(--text)' }}>{data.score}</span>
-            <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>/ 100</span>
+            <span style={{ fontSize: 32, fontWeight: 800, color: 'var(--text)' }}>{repScores.reputationScore}</span>
+            <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>REP</span>
           </div>
           <div style={{ width: '100%', height: 4, background: 'var(--border)', marginTop: 12 }}>
-            <div style={{ width: `${data.score}%`, height: '100%', background: 'var(--violet)' }} />
+            <div style={{ width: `${Math.min(100, repScores.reputationScore / 10)}%`, height: '100%', background: 'var(--violet)' }} />
           </div>
         </div>
 
-        {/* MON Rewards */}
+        {/* Knowledge Score */}
         <div style={{ background: 'var(--deep)', border: '1px solid var(--border)', padding: 'var(--s3)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', bottom: -10, right: -10, fontSize: 80, opacity: 0.04, userSelect: 'none' }}>🪙</div>
-          <h4 style={{ fontSize: 11, fontFamily: 'JetBrains Mono', color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Recompensas MON Obtenidas</h4>
+          <div style={{ position: 'absolute', bottom: -10, right: -10, fontSize: 80, opacity: 0.04, userSelect: 'none' }}>🧠</div>
+          <h4 style={{ fontSize: 11, fontFamily: 'JetBrains Mono', color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Knowledge Score (BKUs / AKUs)</h4>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontSize: 32, fontWeight: 800, color: 'var(--success)' }}>{data.monEarned.toFixed(1)}</span>
-            <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>MON</span>
+            <span style={{ fontSize: 32, fontWeight: 800, color: 'var(--success)' }}>{repScores.knowledgeScore}</span>
+            <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>PTS</span>
           </div>
           <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 12, fontFamily: 'JetBrains Mono' }}>
-            Distribución automática por hitos científicos.
+            Unidades de conocimiento validadas por contrato.
           </p>
         </div>
 
-        {/* Certs Count */}
+        {/* Consistency Score */}
         <div style={{ background: 'var(--deep)', border: '1px solid var(--border)', padding: 'var(--s3)', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', bottom: -10, right: -10, fontSize: 80, opacity: 0.04, userSelect: 'none' }}>📜</div>
-          <h4 style={{ fontSize: 11, fontFamily: 'JetBrains Mono', color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Coleccionables Acuñados</h4>
+          <div style={{ position: 'absolute', bottom: -10, right: -10, fontSize: 80, opacity: 0.04, userSelect: 'none' }}>⚡</div>
+          <h4 style={{ fontSize: 11, fontFamily: 'JetBrains Mono', color: 'var(--text-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Consistency Score</h4>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
             <span style={{ fontSize: 32, fontWeight: 800, color: 'var(--warn)' }}>
-              {data.certs.filter(c => c.status === 'minted').length}
+              {repScores.consistencyScore}%
             </span>
-            <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>/ {data.certs.length} NFTs</span>
           </div>
-          <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 12, fontFamily: 'JetBrains Mono' }}>
-            Resguardo criptográfico verificado por Axiom.
-          </p>
+          <div style={{ width: '100%', height: 4, background: 'var(--border)', marginTop: 12 }}>
+            <div style={{ width: `${repScores.consistencyScore}%`, height: '100%', background: 'var(--warn)' }} />
+          </div>
         </div>
       </div>
 
