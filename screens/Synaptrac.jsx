@@ -353,6 +353,7 @@ function SynaptracScreen() {
   const [nodes, setNodes]             = useState(INITIAL_NODES);
   const [edges, setEdges]             = useState(INITIAL_EDGES);
   const [input, setInput]             = useState('');
+  const [isLoading, setIsLoading]     = useState(false);
   const [activeDCId, setActiveDCId]   = useState(null);   // msgId
   const [activeDCType, setActiveDCType] = useState(null); // 'divergir'|'converger'
   const [sessionCard, setSessionCard] = useState(null);
@@ -460,58 +461,50 @@ function SynaptracScreen() {
   }, [activeDCId, activeDCType, messages, nodes, edges]);
 
   const handleSend = () => {
-    if (!input.trim()) return;
+    if (!input.trim() || isLoading) return;
     const timestamp = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    
-    // Optimistic UI updates
+    const sentText = input;
+
+    // Optimistic: add student message immediately
     const tempId = `m_${Date.now()}`;
-    const studentMsg = {
-      id: tempId, role: 'student',
-      timestamp: timestamp,
-      text: input, concepts: [],
-    };
+    const studentMsg = { id: tempId, role: 'student', timestamp, text: sentText, concepts: [] };
     setMessages(prev => [...prev, studentMsg]);
     setInput('');
+    setIsLoading(true);
 
     fetch('/api/chat/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ student_id: 'JD', text: input, timestamp })
+      body: JSON.stringify({ student_id: 'JD', text: sentText, timestamp })
     })
     .then(res => res.json())
     .then(data => {
+      setIsLoading(false);
       if (data.ai_message) {
         setMessages(prev => {
           const filtered = prev.filter(m => m.id !== tempId);
           return [...filtered, data.student_message, data.ai_message];
         });
-        if (data.graph_node) {
-          setNodes(prev => [...prev, data.graph_node]);
-        }
-        if (data.graph_edge) {
-          setEdges(prev => [...prev, data.graph_edge]);
-        }
+        if (data.graph_node) setNodes(prev => [...prev, data.graph_node]);
+        if (data.graph_edge) setEdges(prev => [...prev, data.graph_edge]);
       }
     })
     .catch(err => {
+      setIsLoading(false);
       console.log('API Send error, using mock fallback', err);
-      setTimeout(() => {
-        const nodeId = `n${nodes.length + 1}`;
-        const reply = {
-          id: `ai_${Date.now()}`, role: 'ai',
-          timestamp: timestamp,
-          nodeId,
-          text: 'Argumento registrado (offline). La profundidad de esta rama se incrementa con cada intervención fundamentada. ¿Quieres explorar las implicaciones cuánticas de la no-localidad o mantener el foco en relatividad especial?',
-          concepts: [{ id: `c_${Date.now()}`, label: 'No-localidad cuántica (mock)', type: 'concept' }],
-        };
-        setMessages(prev => [...prev, reply]);
-        const newNode = {
-          id: nodeId, label: input.slice(0, 8) + '…', type: 'branch',
-          hash: `0x${Math.floor(Math.random()*0xFFFF).toString(16)}`, module: 'synaptrac',
-        };
-        setNodes(prev => [...prev, newNode]);
-        setEdges(prev => [...prev, { source: prev[prev.length-1]?.target || 'root', target: nodeId, label: 'responde' }]);
-      }, 900);
+      const nodeId = `n${nodes.length + 1}`;
+      const reply = {
+        id: `ai_${Date.now()}`, role: 'ai', timestamp, nodeId,
+        text: 'Argumento registrado (offline). ¿Quieres explorar las implicaciones de este concepto o consolidar con la rama principal?',
+        concepts: [],
+      };
+      setMessages(prev => [...prev, reply]);
+      const newNode = {
+        id: nodeId, label: sentText.slice(0, 8) + '…', type: 'branch',
+        hash: `0x${Math.floor(Math.random()*0xFFFF).toString(16)}`, module: 'synaptrac',
+      };
+      setNodes(prev => [...prev, newNode]);
+      setEdges(prev => [...prev, { source: prev[prev.length-1]?.target || 'root', target: nodeId, label: 'responde' }]);
     });
   };
 
@@ -572,6 +565,28 @@ function SynaptracScreen() {
             />
           ))}
 
+          {/* Typing indicator */}
+          {isLoading && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', animation: 'fadeUp 0.28s ease both' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <div style={{ width: 20, height: 20, background: 'var(--violet)', borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 8px rgba(110,84,255,0.5)' }}>
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1L9 3v4L5 9 1 7V3L5 1z" fill="white" opacity="0.9"/></svg>
+                </div>
+                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-dim)' }}>Lorentz.ai · procesando…</span>
+              </div>
+              <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '2px', padding: '14px 18px' }}>
+                <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                  {[0, 1, 2].map(i => (
+                    <div key={i} style={{
+                      width: 7, height: 7, background: 'var(--violet)', borderRadius: '50%',
+                      animation: `pulse 1.2s ease-in-out ${i * 0.22}s infinite`,
+                    }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {sessionCard && <SessionCard nodesCreated={sessionCard.nodesCreated} commits={sessionCard.commits} />}
           <div ref={msgEndRef} />
         </div>
@@ -585,32 +600,39 @@ function SynaptracScreen() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                placeholder="Desarrolla tu argumento… (Enter para enviar)"
+                placeholder={isLoading ? 'Lorentz.ai está procesando tu argumento…' : 'Desarrolla tu argumento… (Enter para enviar)'}
                 rows={2}
+                disabled={isLoading}
                 style={{
                   width: '100%', resize: 'none',
-                  background: 'var(--slate)', border: '1px solid var(--border)',
+                  background: isLoading ? 'var(--deep)' : 'var(--slate)',
+                  border: '1px solid var(--border)',
                   borderRadius: '2px', padding: '10px 13px',
-                  color: 'var(--text)', fontSize: 13, fontFamily: 'DM Sans', outline: 'none', lineHeight: 1.5,
-                  transition: 'border-color 150ms ease',
+                  color: isLoading ? 'var(--text-dim)' : 'var(--text)',
+                  fontSize: 13, fontFamily: 'DM Sans', outline: 'none', lineHeight: 1.5,
+                  transition: 'all 150ms ease', cursor: isLoading ? 'not-allowed' : 'text',
                 }}
-                onFocus={e => e.target.style.borderColor = 'var(--violet)'}
+                onFocus={e => { if (!isLoading) e.target.style.borderColor = 'var(--violet)'; }}
                 onBlur={e => e.target.style.borderColor = 'var(--border)'}
               />
             </div>
-            <button onClick={handleSend} style={{
+            <button onClick={handleSend} disabled={isLoading} style={{
               padding: '10px 21px', height: 60,
-              background: 'var(--violet)', border: '2px solid rgba(0,0,0,0.3)',
-              borderRadius: '2px', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              boxShadow: '3px 3px 0 var(--violet-deep)', transition: 'all 120ms cubic-bezier(0.25,0,0.35,1)',
-              display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+              background: isLoading ? 'var(--violet-deep)' : 'var(--violet)',
+              border: '2px solid rgba(0,0,0,0.3)',
+              borderRadius: '2px', color: 'white', fontSize: 13, fontWeight: 600,
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              boxShadow: isLoading ? 'none' : '3px 3px 0 var(--violet-deep)',
+              transition: 'all 120ms cubic-bezier(0.25,0,0.35,1)',
+              display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, opacity: isLoading ? 0.6 : 1,
             }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translate(-2px,-2px)'; e.currentTarget.style.boxShadow = '5px 5px 0 var(--violet-deep)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '3px 3px 0 var(--violet-deep)'; }}>
-              Enviar
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                <path d="M1 7h12M8 3l5 4-5 4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+            onMouseEnter={e => { if (!isLoading) { e.currentTarget.style.transform = 'translate(-2px,-2px)'; e.currentTarget.style.boxShadow = '5px 5px 0 var(--violet-deep)'; } }}
+            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = isLoading ? 'none' : '3px 3px 0 var(--violet-deep)'; }}>
+              {isLoading ? 'IA…' : 'Enviar'}
+              {isLoading
+                ? <div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                : <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M1 7h12M8 3l5 4-5 4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              }
             </button>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>

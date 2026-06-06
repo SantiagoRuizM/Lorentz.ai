@@ -6,9 +6,117 @@ import sqlite3
 import hashlib
 import mimetypes
 import urllib.parse
+import urllib.request
+import urllib.error
 import time
 import traceback
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+
+# ── Load .env file ────────────────────────────────────────────────────────────
+def _load_env():
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if not os.path.exists(env_path):
+        return
+    with open(env_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = val
+
+_load_env()
+
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL   = os.environ.get("OPENROUTER_MODEL", "anthropic/claude-3-5-haiku")
+
+_PHYSICS_SYSTEM_PROMPT = """Eres Lorentz.ai, un tutor socrático de física especializado en relatividad especial y electromagnetismo clásico.
+
+El estudiante activo es Johannes Droste (JD). La sesión cubre: "Transformaciones de Lorentz en marcos de referencia inerciales".
+
+Tu rol:
+- Guiar con preguntas que profundicen la comprensión, no solo dar respuestas directas
+- Detectar conceptos clave y corregir errores con rigor
+- Mantener un tono riguroso pero accesible, siempre en español
+
+FORMATO DE RESPUESTA — Responde ÚNICAMENTE con un objeto JSON válido, sin markdown ni texto extra:
+{
+  "text": "Respuesta principal. 1-3 párrafos. Termina con pregunta socrática cuando sea apropiado.",
+  "formula": "Expresión matemática en texto plano si aplica. Ejemplo: Δt' = γ · Δt. null si no aplica.",
+  "formulaNote": "Nota de una línea sobre la fórmula. null si no hay fórmula.",
+  "concepts": [
+    {"label": "Nombre del concepto (máx 25 chars)", "type": "equation|concept|theorem|paradox"}
+  ]
+}
+
+Si no hay fórmula: formula=null, formulaNote=null. Si no hay conceptos: concepts=[]."""
+
+
+def call_openrouter(db_history):
+    """Call OpenRouter with the full chat history. Returns dict with text/formula/concepts or None on failure."""
+    if not OPENROUTER_API_KEY or OPENROUTER_API_KEY.startswith("sk-or-v1-xxx"):
+        return None
+
+    or_messages = [{"role": "system", "content": _PHYSICS_SYSTEM_PROMPT}]
+    for msg in db_history[-20:]:  # last 20 messages for context window
+        role = "user" if msg["role"] == "student" else "assistant"
+        content = msg["text"]
+        if msg.get("formula"):
+            content += f"\n[Fórmula: {msg['formula']}]"
+        or_messages.append({"role": role, "content": content})
+
+    payload = json.dumps({
+        "model": OPENROUTER_MODEL,
+        "messages": or_messages,
+        "temperature": 0.7,
+        "max_tokens": 1024,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://openrouter.ai/api/v1/chat/completions",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "http://localhost:8080",
+            "X-Title": "Lorentz.ai",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            raw = result["choices"][0]["message"]["content"].strip()
+            # Strip markdown code fences if the model adds them
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            try:
+                parsed = json.loads(raw)
+                # Normalize concepts ids
+                concepts = []
+                for i, c in enumerate(parsed.get("concepts") or []):
+                    concepts.append({
+                        "id": f"c_{int(time.time()*1000)}_{i}",
+                        "label": c.get("label", "")[:25],
+                        "type": c.get("type", "concept"),
+                    })
+                return {
+                    "text": parsed.get("text", raw),
+                    "formula": parsed.get("formula") or None,
+                    "formulaNote": parsed.get("formulaNote") or None,
+                    "concepts": concepts,
+                }
+            except (json.JSONDecodeError, KeyError):
+                return {"text": raw, "formula": None, "formulaNote": None, "concepts": []}
+    except Exception as e:
+        print(f"[OpenRouter] Error: {e}")
+        return None
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lorentz.db")
 
@@ -415,30 +523,47 @@ def handle_api(path, method, body_data):
                     WHERE id = ?
                 """, (new_nodes_cnt, new_depth, new_score, student_id))
 
-                # Create AI reply
-                reply_text = f"Argumento registrado para el nodo {new_node_id}. Tu análisis sobre '{text}' ha sido procesado por el motor cognitivo. ¿Deseas expandir esta rama o consolidar con la principal?"
+                # ── AI reply: try OpenRouter first, fall back to keyword mock ──
                 reply_id = f"ai_{msg_id}"
-                
-                lower_text = text.lower()
-                concepts = []
-                formula = None
-                formula_note = None
 
-                if "dilatación" in lower_text or "tiempo" in lower_text:
-                    reply_text = "La dilatación del tiempo revela cómo la métrica de Minkowski unifica espacio y tiempo. Desde el frame estacionario, el intervalo temporal propio se dilata según el factor γ. ¿Qué opinas del comportamiento límite para v → c?"
-                    concepts = [{"id": f"c_{msg_id}_1", "label": "Dilatación de Lorentz", "type": "concept"}]
-                    formula = "Δt' = γ · Δt"
-                    formula_note = "El tiempo propio es un invariante geométrico en la geodésica."
-                elif "contracción" in lower_text or "longitud" in lower_text:
-                    reply_text = "La contracción de Lorentz ocurre solo en la dirección del movimiento relativo. La longitud medida disminuye por el factor 1/γ para preservar la velocidad de la luz c. ¿Cómo afecta esto a la simultaneidad de los extremos?"
-                    concepts = [{"id": f"c_{msg_id}_1", "label": "Contracción de longitud", "type": "concept"}]
-                    formula = "L' = L / γ"
-                elif "conos" in lower_text or "luz" in lower_text or "causalidad" in lower_text:
-                    reply_text = "Los conos de luz dividen el espacio-tiempo de Minkowski en pasado, futuro y la región inaccesible causalmente. Los intervalos tipo espacio quedan fuera. ¿Ves alguna forma de violar causalidad sin violar la velocidad de la luz?"
-                    concepts = [{"id": f"c_{msg_id}_1", "label": "Cono de luz", "type": "concept"}]
-                elif "minkowski" in lower_text or "métrica" in lower_text:
-                    reply_text = "La métrica η_μν = diag(1, -1, -1, -1) define la estructura pseudo-euclídea del espacio-tiempo. A diferencia de la geometría euclídea, los intervalos pueden ser negativos (tipo espacio) o cero (tipo luz)."
-                    concepts = [{"id": f"c_{msg_id}_1", "label": "Métrica de Minkowski", "type": "concept"}]
+                # Fetch full conversation history for context (including message just saved)
+                cursor.execute("""
+                    SELECT role, text, formula FROM chat_messages
+                    WHERE student_id = ? ORDER BY rowid ASC
+                """, (student_id,))
+                full_history = [dict(r) for r in cursor.fetchall()]
+
+                ai = call_openrouter(full_history)
+
+                if ai:
+                    reply_text  = ai["text"]
+                    formula     = ai["formula"]
+                    formula_note = ai["formulaNote"]
+                    concepts    = ai["concepts"]
+                else:
+                    # Keyword-based mock fallback
+                    lower_text = text.lower()
+                    concepts = []
+                    formula = None
+                    formula_note = None
+
+                    if "dilatación" in lower_text or "tiempo" in lower_text:
+                        reply_text = "La dilatación del tiempo revela cómo la métrica de Minkowski unifica espacio y tiempo. Desde el frame estacionario, el intervalo temporal propio se dilata según el factor γ. ¿Qué opinas del comportamiento límite para v → c?"
+                        concepts = [{"id": f"c_{msg_id}_1", "label": "Dilatación de Lorentz", "type": "concept"}]
+                        formula = "Δt' = γ · Δt"
+                        formula_note = "El tiempo propio es un invariante geométrico en la geodésica."
+                    elif "contracción" in lower_text or "longitud" in lower_text:
+                        reply_text = "La contracción de Lorentz ocurre solo en la dirección del movimiento relativo. La longitud medida disminuye por el factor 1/γ para preservar la velocidad de la luz c. ¿Cómo afecta esto a la simultaneidad de los extremos?"
+                        concepts = [{"id": f"c_{msg_id}_1", "label": "Contracción de longitud", "type": "concept"}]
+                        formula = "L' = L / γ"
+                    elif "conos" in lower_text or "luz" in lower_text or "causalidad" in lower_text:
+                        reply_text = "Los conos de luz dividen el espacio-tiempo de Minkowski en pasado, futuro y la región inaccesible causalmente. Los intervalos tipo espacio quedan fuera. ¿Ves alguna forma de violar causalidad sin violar la velocidad de la luz?"
+                        concepts = [{"id": f"c_{msg_id}_1", "label": "Cono de luz", "type": "concept"}]
+                    elif "minkowski" in lower_text or "métrica" in lower_text:
+                        reply_text = "La métrica η_μν = diag(1, -1, -1, -1) define la estructura pseudo-euclídea del espacio-tiempo. A diferencia de la geometría euclídea, los intervalos pueden ser negativos (tipo espacio) o cero (tipo luz)."
+                        concepts = [{"id": f"c_{msg_id}_1", "label": "Métrica de Minkowski", "type": "concept"}]
+                    else:
+                        reply_text = f"Argumento registrado para el nodo {new_node_id}. Tu análisis sobre '{text[:40]}' ha sido procesado por el motor cognitivo. ¿Deseas expandir esta rama o consolidar con la principal?"
 
                 concepts_json = json.dumps(concepts)
                 cursor.execute("""
@@ -813,7 +938,7 @@ class LorentzHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path.startswith("/api/"):
             content_length = int(self.headers.get("Content-Length", 0))
-            body_data = self.rfile.read(content_length).decode("utf-8") if content_length > 0 else None
+            body_data = self.rfile.read(content_length).decode("utf-8", errors="replace") if content_length > 0 else None
             
             status_code, data = handle_api(self.path, "POST", body_data)
             self.send_response(status_code)
