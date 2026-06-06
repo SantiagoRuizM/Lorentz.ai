@@ -64,7 +64,6 @@ function RainbowKitModal({ onClose, onConnect }) {
   const [selectedWallet, setSelectedWallet] = useState('metamask');
   const [connecting, setConnecting]       = useState(false);
   const [errorMsg, setErrorMsg]             = useState('');
-  const [simulating, setSimulating]         = useState(false);
 
   const handleWalletSelect = (walletId) => {
     setSelectedWallet(walletId);
@@ -73,7 +72,7 @@ function RainbowKitModal({ onClose, onConnect }) {
 
   const connectRealWallet = async () => {
     if (typeof window.ethereum === 'undefined') {
-      setErrorMsg('Billetera Web3 no detectada en tu navegador. Puedes usar el botón de abajo para "Simular Conexión".');
+      setErrorMsg('No se detectó ninguna billetera Web3 (como MetaMask o Rabby) en tu navegador. Por favor instala una extensión de billetera para continuar.');
       return;
     }
 
@@ -137,7 +136,6 @@ function RainbowKitModal({ onClose, onConnect }) {
         }
       } catch (rpcErr) {
         console.error('Error fetching balance from Monad RPC:', rpcErr);
-        balance = '12.4500'; // fallback mock balance if testnet RPC is rate-limited
       }
 
       setConnecting(false);
@@ -148,22 +146,6 @@ function RainbowKitModal({ onClose, onConnect }) {
       setErrorMsg(err.message || 'Error al conectar billetera.');
       setConnecting(false);
     }
-  };
-
-  const connectMockWallet = () => {
-    setConnecting(true);
-    setSimulating(true);
-    setErrorMsg('');
-
-    setTimeout(() => {
-      // Connect a mock address with a realistic balance
-      const mockAddress = '0x5C4E5E97D79D6E30128B9361661AEdF872fE97d9';
-      const mockBalance = '15.7832';
-      setConnecting(false);
-      setSimulating(false);
-      onConnect(mockAddress, mockBalance, false); // address, balance, isReal (simulated)
-      onClose();
-    }, 1500);
   };
 
   return (
@@ -258,10 +240,10 @@ function RainbowKitModal({ onClose, onConnect }) {
                 }} />
                 <div>
                   <h4 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>
-                    {simulating ? 'Simulando firma criptográfica...' : 'Esperando aprobación de billetera...'}
+                    Esperando aprobación de billetera...
                   </h4>
                   <p style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono' }}>
-                    {simulating ? 'Conectando con Monad Testnet RPC' : 'Confirma la solicitud de conexión en tu extensión.'}
+                    Confirma la solicitud de conexión en tu extensión de billetera.
                   </p>
                 </div>
               </div>
@@ -305,19 +287,6 @@ function RainbowKitModal({ onClose, onConnect }) {
                     onMouseLeave={e => { e.currentTarget.style.background = 'var(--violet)'; }}
                   >
                     Establecer Conexión →
-                  </button>
-
-                  <button
-                    onClick={connectMockWallet}
-                    style={{
-                      width: '100%', padding: '9px', background: 'transparent', border: '1px solid var(--border)',
-                      borderRadius: '2px', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer',
-                      fontFamily: 'JetBrains Mono', transition: 'all 150ms'
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text-dim)'; e.currentTarget.style.color = 'var(--text)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-                  >
-                    [Simular Conexión Testnet]
                   </button>
                 </div>
               </div>

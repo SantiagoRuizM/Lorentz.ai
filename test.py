@@ -95,18 +95,31 @@ try:
         print(f"[FAIL] Test 6: Could not query Axiom events to test verification")
         tests_failed += 1
 
-    # Test 7: Static file serving
+    # Test 7: Blockchain Config Persistence (GET/POST)
+    config_payload = {
+        "sbc": "0x1111111111111111111111111111111111111111",
+        "knowledge": "0x2222222222222222222222222222222222222222"
+    }
+    status_post, res_post = query_api("/api/blockchain/config", "POST", config_payload)
+    status_get, res_get = query_api("/api/blockchain/config", "GET")
+    if status_post == 200 and status_get == 200 and res_get.get("sbc") == config_payload["sbc"] and res_get.get("knowledge") == config_payload["knowledge"]:
+        print("[PASS] Test 7: Blockchain Config Persistence (GET/POST)")
+    else:
+        print(f"[FAIL] Test 7: Blockchain Config Persistence (Post Status: {status_post}, Get Status: {status_get}, Response: {res_get})")
+        tests_failed += 1
+
+    # Test 8: Static file serving
     url_static = f"http://localhost:{PORT}/Lorentz.html"
     try:
         with urllib.request.urlopen(url_static) as response:
             html_content = response.read().decode("utf-8")
             if response.status == 200 and "<title>Lorentz.ai</title>" in html_content:
-                print("[PASS] Test 7: Static file serving (Lorentz.html)")
+                print("[PASS] Test 8: Static file serving (Lorentz.html)")
             else:
-                print(f"[FAIL] Test 7: Static file serving did not return correct title")
+                print(f"[FAIL] Test 8: Static file serving did not return correct title")
                 tests_failed += 1
     except Exception as e:
-        print(f"[FAIL] Test 7: Static file serving error: {e}")
+        print(f"[FAIL] Test 8: Static file serving error: {e}")
         tests_failed += 1
 
 finally:
