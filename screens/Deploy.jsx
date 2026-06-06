@@ -206,6 +206,19 @@ function DeployScreen({ walletAddress, walletBalance, setWalletBalance, deployed
         [currentContractInfo.id]: deployedAddr
       }));
 
+      // Persist to database
+      try {
+        await fetch('/api/blockchain/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [currentContractInfo.id]: deployedAddr })
+        });
+        addLog(`Dirección guardada persistentemente en la base de datos.`, 'info');
+      } catch (dbErr) {
+        console.error("Error saving to db:", dbErr);
+        addLog(`Error al guardar persistentemente en la base de datos.`, 'warn');
+      }
+
       // Fetch updated balance from Monad Testnet RPC
       let newBalance = walletBalance;
       try {

@@ -1,6 +1,6 @@
 
 // App.jsx — Role-based routing with login gate
-const { useState } = React;
+const { useState, useEffect } = React;
 
 const DEFAULT_SCREEN = {
   estudiante:   'synaptrac',
@@ -28,6 +28,17 @@ function App() {
     achievement: '',
     reputation: ''
   });
+
+  useEffect(() => {
+    fetch('/api/blockchain/config')
+      .then(res => res.json())
+      .then(data => {
+        if (data && !data.error) {
+          setDeployedAddresses(data);
+        }
+      })
+      .catch(err => console.error("Error loading blockchain config:", err));
+  }, []);
 
   const handleLogin = (r) => {
     const chosenRole = r || 'estudiante';

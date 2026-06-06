@@ -246,6 +246,13 @@ def init_db():
         payload TEXT NOT NULL
     )""")
 
+    # System Config Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS system_config (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    )""")
+
     # Populate default data if students table is empty
     cursor.execute("SELECT COUNT(*) FROM students")
     if cursor.fetchone()[0] == 0:
@@ -1233,6 +1240,29 @@ def handle_api(path, method, body_data):
                 response_data = d
             else:
                 response_data = {"knowledgeScore": 45, "reputationScore": 870, "consistencyScore": 72}
+
+        elif route == "/api/blockchain/config" and method == "GET":
+            cursor.execute("SELECT key, value FROM system_config WHERE key IN ('sbc', 'knowledge', 'evidence', 'achievement', 'reputation')")
+            rows = cursor.fetchall()
+            config = {row["key"]: row["value"] for row in rows}
+            # Fill defaults
+            for key in ['sbc', 'knowledge', 'evidence', 'achievement', 'reputation']:
+                if key not in config:
+                    config[key] = ''
+            response_data = config
+
+        elif route == "/api/blockchain/config" and method == "POST":
+            payload = json.loads(body_data) if body_data else {}
+            for key in ['sbc', 'knowledge', 'evidence', 'achievement', 'reputation']:
+                if key in payload:
+                    val = str(payload[key])
+                    cursor.execute("SELECT 1 FROM system_config WHERE key = ?", (key,))
+                    if cursor.fetchone():
+                        cursor.execute("UPDATE system_config SET value = ? WHERE key = ?", (val, key))
+                    else:
+                        cursor.execute("INSERT INTO system_config (key, value) VALUES (?, ?)", (key, val))
+            conn.commit()
+            response_data = {"success": True}
 
         else:
             status_code = 404
