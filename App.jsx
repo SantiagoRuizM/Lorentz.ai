@@ -6,8 +6,8 @@ const DEFAULT_SCREEN = {
   estudiante:   'synaptrac',
   profesor:     'professor',
   revisor:      'revisor',
-  investigador: 'synaptrac',
-  laboratorio:  'kmerge',
+  investigador: 'nexus',
+  laboratorio:  'nexus',
   sponsor:      'axiom',
 };
 
@@ -77,11 +77,13 @@ function App() {
 
   const renderScreen = () => {
     switch (screen) {
+      case 'nexus':        return <NexusScreen />;
       case 'synaptrac':    return <SynaptracScreen />;
       case 'graph':        return <GraphScreen />;
       case 'kmerge':       return <KMergeScreen />;
       case 'discursus':    return <DiscursusScreen />;
       case 'professor':    return <ProfessorScreen />;
+      case 'cursos':       return <CursosScreen />;
       case 'revisor':      return <RevisorScreen />;
       case 'axiom':        return <AxiomScreen />;
       case 'profile':      return <ProfileScreen />;

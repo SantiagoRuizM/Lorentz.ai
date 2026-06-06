@@ -3,11 +3,13 @@
 const { useState, useEffect, useRef } = React;
 
 const SCREEN_LABELS = {
+  nexus:       { title: 'Nexus',                 sub: 'Árbol de conocimiento · Fuente de verdad' },
   synaptrac:   { title: 'Synaptrac',             sub: 'IA Acompañante · Debate Activo' },
   graph:       { title: 'Grafo de Pensamiento',  sub: 'Vista global · 24 nodos' },
   kmerge:      { title: 'K-Merge',               sub: 'Git para documentos · 3 commits pendientes' },
   discursus:   { title: 'Discursus',             sub: 'Reunión grabada · Transcripción activa' },
   professor:   { title: 'Panel Profesor',        sub: 'Auditoría · 6 estudiantes activos' },
+  cursos:      { title: 'Cursos',               sub: 'Bibliografía · Papers y fuentes académicas' },
   revisor:     { title: 'Revisión Académica',    sub: 'Axiom L2 · Perfil público verificable' },
   axiom:       { title: 'Axiom L2',             sub: 'Block explorer · Verificación pública' },
   profile:     { title: 'Perfil / Score',        sub: 'Johannes Droste · Semestre actual' },
