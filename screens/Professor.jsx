@@ -364,6 +364,7 @@ function StudentDetail({ student, onBack }) {
               </div>
             </div>
           </>
+        ) : (
           /* Notes tab */
           <div style={{ flex: 1, padding: 'var(--s4)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
             <GaussianWidget highlighted={student.score} />
