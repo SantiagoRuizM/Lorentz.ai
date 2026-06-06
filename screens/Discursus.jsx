@@ -47,9 +47,26 @@ function WaveformBar({ height, active }) {
 function DiscursusScreen() {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0.27);
+  const [transcript, setTranscript] = useState(TRANSCRIPT);
   const [extractedNodes, setExtractedNodes] = useState(['t1', 't3']);
   const [activeTranscript, setActiveTranscript] = useState('t4');
   const timerRef = useRef(null);
+
+  const loadTranscript = () => {
+    fetch('/api/discursus/transcript')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setTranscript(data);
+          setExtractedNodes(data.filter(x => x.extracted).map(x => x.id));
+        }
+      })
+      .catch(err => console.log('Discursus fallback transcript'));
+  };
+
+  useEffect(() => {
+    loadTranscript();
+  }, []);
 
   useEffect(() => {
     if (playing) {
@@ -63,9 +80,28 @@ function DiscursusScreen() {
   }, [playing]);
 
   const handleExtract = (id) => {
-    setExtractedNodes(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    fetch('/api/discursus/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        setTranscript(prev =>
+          prev.map(x => x.id === id ? { ...x, extracted: data.extracted } : x)
+        );
+        setExtractedNodes(prev =>
+          prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        );
+      }
+    })
+    .catch(err => {
+      console.log('Extract API failed, using local fallback');
+      setExtractedNodes(prev =>
+        prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+      );
+    });
   };
 
   const totalTime = '00:18:34';
@@ -104,7 +140,7 @@ function DiscursusScreen() {
                 background: 'var(--card)', display: 'flex',
                 flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 gap: 8, position: 'relative',
-                border: activeTranscript && TRANSCRIPT.find(t => t.id === activeTranscript)?.speaker === name
+                border: activeTranscript && transcript.find(t => t.id === activeTranscript)?.speaker === name
                   ? '1px solid var(--violet)' : '1px solid var(--border)',
                 transition: 'border-color 300ms ease',
               }}>
@@ -114,7 +150,7 @@ function DiscursusScreen() {
                   justifyContent: 'center', fontSize: 20, fontWeight: 700, color: '#07070E',
                 }}>{s.short}</div>
                 <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-muted)' }}>{name}</span>
-                {activeTranscript && TRANSCRIPT.find(t => t.id === activeTranscript)?.speaker === name && (
+                {activeTranscript && transcript.find(t => t.id === activeTranscript)?.speaker === name && (
                   <div style={{
                     position: 'absolute', bottom: 8, left: 8,
                     display: 'flex', gap: 2,
@@ -227,7 +263,7 @@ function DiscursusScreen() {
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--s2) 0' }}>
-          {TRANSCRIPT.map((entry, i) => (
+          {transcript.map((entry, i) => (
             <div
               key={entry.id}
               onClick={() => setActiveTranscript(entry.id)}

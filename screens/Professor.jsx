@@ -175,6 +175,9 @@ function StudentDetail({ student, onBack }) {
   const [tab, setTab]       = useState('chat');
   const [graphW, setGraphW] = useState(300);
   const [graphH, setGraphH] = useState(400);
+  const [history, setHistory] = useState([]);
+  const [gNodes, setGNodes] = useState([]);
+  const [gEdges, setGEdges] = useState([]);
   const graphRef = useRef(null);
 
   useEffect(() => {
@@ -185,9 +188,29 @@ function StudentDetail({ student, onBack }) {
     return () => obs.disconnect();
   }, []);
 
-  const history = CHAT_HISTORIES[student.id] || CHAT_HISTORIES.JD;
-  const gNodes  = NODE_TREES[student.id]  || NODE_TREES.JD;
-  const gEdges  = NODE_EDGES[student.id]  || NODE_EDGES.JD;
+  useEffect(() => {
+    fetch(`/api/professor/chat/${student.id}`)
+      .then(res => res.json())
+      .then(data => { if (Array.isArray(data)) setHistory(data); })
+      .catch(err => {
+        console.log('Fall back to CHAT_HISTORIES');
+        setHistory(CHAT_HISTORIES[student.id] || CHAT_HISTORIES.JD);
+      });
+
+    fetch(`/api/professor/graph/${student.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.nodes && data.edges) {
+          setGNodes(data.nodes);
+          setGEdges(data.edges);
+        }
+      })
+      .catch(err => {
+        console.log('Fall back to NODE_TREES');
+        setGNodes(NODE_TREES[student.id] || NODE_TREES.JD);
+        setGEdges(NODE_EDGES[student.id] || NODE_EDGES.JD);
+      });
+  }, [student.id]);
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'slideIn 0.2s ease both' }}>
@@ -339,6 +362,14 @@ function StudentDetail({ student, onBack }) {
 // ── Main professor screen ──────────────────────────────────────────
 function ProfessorScreen() {
   const [selected, setSelected] = useState(null);
+  const [students, setStudents] = useState(STUDENTS);
+
+  useEffect(() => {
+    fetch('/api/professor/students')
+      .then(res => res.json())
+      .then(data => { if (Array.isArray(data)) setStudents(data); })
+      .catch(err => console.log('Professor fallback students'));
+  }, []);
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: 'var(--void)' }}>
@@ -348,7 +379,7 @@ function ProfessorScreen() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Stats bar */}
           <div style={{ display: 'flex', gap: 2, padding: 'var(--s3)', background: 'var(--deep)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-            {[{ v: STUDENTS.length, l: 'Estudiantes', c: 'var(--violet)' }, { v: STUDENTS.reduce((a,s)=>a+s.nodes,0), l: 'Nodos totales', c: 'var(--violet-bright)' }, { v: (STUDENTS.reduce((a,s)=>a+s.depth,0)/STUDENTS.length).toFixed(1), l: 'Profundidad media', c: 'var(--text)' }, { v: Math.round(STUDENTS.reduce((a,s)=>a+s.score,0)/STUDENTS.length), l: 'Score promedio', c: 'var(--warn)' }].map(({ v, l, c }) => (
+            {[{ v: students.length, l: 'Estudiantes', c: 'var(--violet)' }, { v: students.reduce((a,s)=>a+s.nodes,0), l: 'Nodos totales', c: 'var(--violet-bright)' }, { v: students.length > 0 ? (students.reduce((a,s)=>a+s.depth,0)/students.length).toFixed(1) : 0, l: 'Profundidad media', c: 'var(--text)' }, { v: students.length > 0 ? Math.round(students.reduce((a,s)=>a+s.score,0)/students.length) : 0, l: 'Score promedio', c: 'var(--warn)' }].map(({ v, l, c }) => (
               <div key={l} style={{ flex: 1, background: 'var(--card)', border: '1px solid var(--border)', padding: 'var(--s2) var(--s3)', textAlign: 'center' }}>
                 <div style={{ fontSize: 20, fontWeight: 700, color: c, fontFamily: 'JetBrains Mono', marginBottom: 2 }}>{v}</div>
                 <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{l}</div>
@@ -364,7 +395,7 @@ function ProfessorScreen() {
           {/* Kanban */}
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
             {COLUMNS.map(col => {
-              const colStudents = STUDENTS.filter(s => s.status === col.id);
+              const colStudents = students.filter(s => s.status === col.id);
               return (
                 <div key={col.id} style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)', overflow: 'hidden' }}>
                   <div style={{ height: 40, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, padding: '0 var(--s3)', flexShrink: 0, background: 'var(--deep)' }}>

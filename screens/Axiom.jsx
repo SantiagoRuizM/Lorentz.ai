@@ -169,20 +169,50 @@ function AxiomScreen() {
   const blockCountRef = useRef(blockCount);
   blockCountRef.current = blockCount;
 
+  useEffect(() => {
+    fetch('/api/axiom/events')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setEvents(data);
+          if (data.length > 0) {
+            setBlockCount(data[0].block);
+          }
+        }
+      })
+      .catch(err => console.log('Axiom fallback events'));
+  }, []);
+
   // Fast block interval: 4 seconds
   useEffect(() => {
     const id = setInterval(() => {
-      const newBlock = blockCountRef.current + 1;
-      setBlockCount(newBlock);
-
-      // Pull 2-4 events from mempool + new ones into block
-      const batchSize = 2 + Math.floor(Math.random() * 3);
-      const newEvents = Array.from({ length: batchSize }, () => ({ ...makeEvent(newBlock), isNew: true }));
-
-      setEvents(prev => [...newEvents, ...prev.slice(0, 50)]);
-
-      // Replenish mempool
-      setPending(() => Array.from({ length: 3 + Math.floor(Math.random() * 5) }, () => makeEvent(newBlock + 1)));
+      fetch('/api/axiom/mine', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: 'JD' })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            fetch('/api/axiom/events')
+              .then(res => res.json())
+              .then(evs => {
+                if (Array.isArray(evs)) {
+                  setEvents(evs);
+                  setBlockCount(evs[0]?.block || 1247835);
+                }
+              });
+          }
+        })
+        .catch(err => {
+          console.log('Mining API offline, simulating locally');
+          const newBlock = blockCountRef.current + 1;
+          setBlockCount(newBlock);
+          const batchSize = 2 + Math.floor(Math.random() * 3);
+          const newEvents = Array.from({ length: batchSize }, () => ({ ...makeEvent(newBlock), isNew: true }));
+          setEvents(prev => [...newEvents, ...prev.slice(0, 50)]);
+          setPending(() => Array.from({ length: 3 + Math.floor(Math.random() * 5) }, () => makeEvent(newBlock + 1)));
+        });
     }, 4000);
     return () => clearInterval(id);
   }, []);

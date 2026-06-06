@@ -310,6 +310,57 @@ function ContributorBar() {
 function KMergeScreen() {
   const [hoveredLine, setHoveredLine] = useState(null);
   const [rightTab, setRightTab] = useState('git');
+  const [docLines, setDocLines] = useState(DOC_LINES);
+  const [commits, setCommits] = useState(COMMITS);
+  const [commitMsg, setCommitMsg] = useState('');
+
+  const loadData = () => {
+    fetch('/api/kmerge/lines')
+      .then(res => res.json())
+      .then(data => { if (Array.isArray(data)) setDocLines(data); })
+      .catch(err => console.log('KMerge fallback lines'));
+
+    fetch('/api/kmerge/commits')
+      .then(res => res.json())
+      .then(data => { if (Array.isArray(data)) setCommits(data); })
+      .catch(err => console.log('KMerge fallback commits'));
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleCommit = () => {
+    if (!commitMsg.trim()) return;
+    
+    fetch('/api/kmerge/commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ msg: commitMsg, author: 'JD', branch: 'main' })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        setCommitMsg('');
+        loadData();
+      }
+    })
+    .catch(err => {
+      print('KMerge commit API failed, using local mock', err);
+      // fallback mock
+      const newCommit = {
+        hash: `0x${Math.floor(Math.random()*0xFFFF).toString(16)}`,
+        author: 'JD',
+        msg: commitMsg,
+        ts: 'hace unos segundos',
+        branch: 'main',
+        lines: '+2 -1'
+      };
+      setCommits(prev => [newCommit, ...prev]);
+      setDocLines(prev => [...prev, { text: `% ${newCommit.hash}: ${commitMsg}`, author: 'JD', type: 'body', indent: 0 }]);
+      setCommitMsg('');
+    });
+  };
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: 'var(--void)' }}>
@@ -326,16 +377,30 @@ function KMergeScreen() {
             <path d="M2 1h6l3 3v7H2V1z" stroke="currentColor" strokeWidth="1.2"/>
           </svg>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Lorentz_Force_Covariante.tex</span>
-          <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-dim)' }}>· {DOC_LINES.length} líneas · 4 autores</span>
+          <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: 'var(--text-dim)' }}>· {docLines.length} líneas · 4 autores</span>
           <div style={{ flex: 1 }} />
           <span style={{ fontFamily: 'JetBrains Mono', fontSize: 9, padding: '3px 8px', background: 'rgba(78,236,170,0.07)', border: '1px solid rgba(78,236,170,0.2)', color: 'var(--success)' }}>
-            6 commits
+            {commits.length} commits
           </span>
-          <button style={{
-            padding: '5px 12px', background: 'var(--violet)', border: 'none', borderRadius: '2px',
-            color: 'white', fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            boxShadow: '2px 2px 0 var(--violet-deep)',
-          }}>Nuevo commit</button>
+          <button 
+            onClick={() => {
+              const msg = prompt('Mensaje del nuevo commit:');
+              if (msg) {
+                fetch('/api/kmerge/commit', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ msg, author: 'JD', branch: 'main' })
+                })
+                .then(res => res.json())
+                .then(data => { if (data.success) loadData(); });
+              }
+            }}
+            style={{
+              padding: '5px 12px', background: 'var(--violet)', border: 'none', borderRadius: '2px',
+              color: 'white', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              boxShadow: '2px 2px 0 var(--violet-deep)',
+            }}
+          >Nuevo commit</button>
         </div>
 
         {/* Document + blame columns */}
@@ -345,7 +410,7 @@ function KMergeScreen() {
             flex: 1, overflowY: 'auto', background: 'var(--deep)',
             padding: '16px 0',
           }}>
-            {DOC_LINES.map((line, i) => (
+            {docLines.map((line, i) => (
               <DocLine
                 key={i}
                 line={line}
@@ -358,7 +423,7 @@ function KMergeScreen() {
 
           {/* Blame column */}
           <BlameColumn
-            lines={DOC_LINES}
+            lines={docLines}
             hoveredLine={hoveredLine}
             onHover={setHoveredLine}
           />
@@ -394,14 +459,14 @@ function KMergeScreen() {
         {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {rightTab === 'git' ? (
-            <GitTree commits={COMMITS} />
+            <GitTree commits={commits} />
           ) : (
             <div>
               <ContributorBar />
               {/* Hover tip */}
               <div style={{ padding: 'var(--s3)' }}>
                 <span className="label" style={{ display: 'block', marginBottom: 8 }}>ÚLTIMA ACTIVIDAD</span>
-                {COMMITS.slice(0, 4).map((c, i) => {
+                {commits.slice(0, 4).map((c, i) => {
                   const ctrib = CTRIB[c.author];
                   return (
                     <div key={c.hash} style={{
@@ -424,21 +489,29 @@ function KMergeScreen() {
         {/* Commit input */}
         <div style={{ padding: 'var(--s3)', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
           <span className="label" style={{ display: 'block', marginBottom: 6 }}>COMMIT</span>
-          <input placeholder="Mensaje del commit…" style={{
-            width: '100%', background: 'var(--slate)', border: '1px solid var(--border)',
-            borderRadius: '2px', padding: '7px 10px', color: 'var(--text)',
-            fontSize: 12, fontFamily: 'DM Sans', outline: 'none', marginBottom: 6,
-            transition: 'border-color 150ms',
-          }}
-          onFocus={e => e.target.style.borderColor = 'var(--violet)'}
-          onBlur={e => e.target.style.borderColor = 'var(--border)'}
+          <input 
+            placeholder="Mensaje del commit…" 
+            value={commitMsg}
+            onChange={e => setCommitMsg(e.target.value)}
+            style={{
+              width: '100%', background: 'var(--slate)', border: '1px solid var(--border)',
+              borderRadius: '2px', padding: '7px 10px', color: 'var(--text)',
+              fontSize: 12, fontFamily: 'DM Sans', outline: 'none', marginBottom: 6,
+              transition: 'border-color 150ms',
+            }}
+            onFocus={e => e.target.style.borderColor = 'var(--violet)'}
+            onBlur={e => e.target.style.borderColor = 'var(--border)'}
+            onKeyDown={e => { if (e.key === 'Enter') handleCommit(); }}
           />
-          <button style={{
-            width: '100%', padding: '8px', background: 'var(--violet)',
-            border: 'none', borderRadius: '2px', color: 'white',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer',
-            boxShadow: '2px 2px 0 var(--violet-deep)',
-          }}>Confirmar → Axiom L2</button>
+          <button 
+            onClick={handleCommit}
+            style={{
+              width: '100%', padding: '8px', background: 'var(--violet)',
+              border: 'none', borderRadius: '2px', color: 'white',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              boxShadow: '2px 2px 0 var(--violet-deep)',
+            }}
+          >Confirmar → Axiom L2</button>
         </div>
       </div>
     </div>

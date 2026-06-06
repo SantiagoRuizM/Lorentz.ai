@@ -104,20 +104,46 @@ function HashVerifier() {
   const verify = () => {
     if (!input.trim()) return;
     setLoading(true);
-    setTimeout(() => {
+    setResult(null);
+    
+    fetch('/api/revisor/verify-hash', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hash: input })
+    })
+    .then(res => res.json())
+    .then(data => {
       setLoading(false);
-      // Simulate verification
-      const found = input.length > 6;
-      setResult(found ? {
-        valid: true,
-        block: 1247835,
-        ts: '2025-04-30 14:24:01 UTC',
-        type: 'NODE_CREATED',
-        student: 'Johannes Droste (JD)',
-        module: 'synaptrac',
-        payload: `{"nodeId":"n7","depth":4,"concept":"Factor γ","score":8.4}`,
-      } : { valid: false });
-    }, 1000);
+      if (data.found) {
+        setResult({
+          valid: true,
+          block: data.event.block,
+          ts: data.event.ts,
+          type: data.event.type,
+          student: data.event.student,
+          module: data.event.module,
+          payload: data.event.payload
+        });
+      } else {
+        setResult({ valid: false });
+      }
+    })
+    .catch(err => {
+      console.log('Verify hash API error, fallback to simulated', err);
+      setTimeout(() => {
+        setLoading(false);
+        const found = input.length > 6;
+        setResult(found ? {
+          valid: true,
+          block: 1247835,
+          ts: '2025-04-30 14:24:01 UTC',
+          type: 'NODE_CREATED',
+          student: 'Johannes Droste (JD)',
+          module: 'synaptrac',
+          payload: `{"nodeId":"n7","depth":4,"concept":"Factor γ","score":8.4}`,
+        } : { valid: false });
+      }, 1000);
+    });
   };
 
   return (
@@ -174,9 +200,21 @@ function HashVerifier() {
 
 // ── Student profile panel ──────────────────────────────────────────
 function StudentProfile({ student }) {
-  const hashes = PROFILE_HASHES[student.id] || [];
+  const [hashes, setHashes] = useState([]);
   const [reviewNote, setReviewNote] = useState('');
   const [submitted, setSubmitted]   = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/revisor/hashes/${student.id}`)
+      .then(res => res.json())
+      .then(data => { if (Array.isArray(data)) setHashes(data); })
+      .catch(err => {
+        console.log('Fall back to PROFILE_HASHES', err);
+        setHashes(PROFILE_HASHES[student.id] || []);
+      });
+    setSubmitted(false);
+    setReviewNote('');
+  }, [student.id]);
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--s4)', display: 'flex', flexDirection: 'column', gap: 'var(--s3)', animation: 'slideIn 0.2s ease both' }}>
@@ -282,10 +320,25 @@ function StudentProfile({ student }) {
 
 // ── Main revisor screen ────────────────────────────────────────────
 function RevisorScreen() {
+  const [students, setStudents] = useState(STUDENTS_REV);
   const [selected, setSelected] = useState(STUDENTS_REV[0]);
   const [search, setSearch]     = useState('');
 
-  const filtered = STUDENTS_REV.filter(s =>
+  useEffect(() => {
+    fetch('/api/revisor/students')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setStudents(data);
+          if (data.length > 0) {
+            setSelected(data[0]);
+          }
+        }
+      })
+      .catch(err => console.log('Revisor fallback students'));
+  }, []);
+
+  const filtered = students.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
     s.id.toLowerCase().includes(search.toLowerCase())
   );

@@ -373,6 +373,25 @@ function SynaptracScreen() {
     return () => obs.disconnect();
   }, []);
 
+  useEffect(() => {
+    fetch('/api/chat/messages?student_id=JD')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setMessages(data);
+      })
+      .catch(err => console.log('API fallback to INITIAL_MESSAGES'));
+
+    fetch('/api/chat/graph?student_id=JD')
+      .then(res => res.json())
+      .then(data => {
+        if (data.nodes && data.edges) {
+          setNodes(data.nodes);
+          setEdges(data.edges);
+        }
+      })
+      .catch(err => console.log('API fallback to INITIAL_NODES'));
+  }, []);
+
   const handleDCAction = useCallback((msgId, action, concept) => {
     // Toggle panel
     if (activeDCId === msgId && activeDCType === action && !concept) {
@@ -382,60 +401,118 @@ function SynaptracScreen() {
 
     if (action === 'concept') return; // just open panel for concept pills
 
-    // Execute the action
-    const newNodeId  = `node_${Date.now()}`;
-    const sourceMsg  = messages.find(m => m.id === msgId);
-    const newNode = {
-      id: newNodeId,
-      label: action === 'divergir' ? 'Nueva rama' : 'Convergido',
-      type: action === 'divergir' ? 'branch' : 'leaf',
-      hash: `0x${Math.floor(Math.random()*0xFFFF).toString(16).padStart(4,'0')}`,
-      module: 'synaptrac', isNew: true,
-    };
-    const lastNode = nodes[nodes.length - 1];
-    setNodes(prev => [...prev, newNode]);
-    setEdges(prev => [...prev, { source: lastNode.id, target: newNodeId, label: action }]);
+    const timestamp = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    const confirmMsg = {
-      id: `sys_${Date.now()}`, role: 'ai',
-      timestamp: new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      nodeId: newNodeId,
-      text: action === 'divergir'
-        ? `Rama divergente creada. El nodo ${newNodeId.slice(-6)} fue añadido a tu grafo. Desarrolla el argumento — cada nivel de profundidad incrementa tu score académico.`
-        : `Insight convergido con la rama actual. La síntesis argumentativa fue registrada. Hash pendiente de confirmación en Axiom L2.`,
-      concepts: [],
-    };
-    setMessages(prev => [...prev, confirmMsg]);
-    setSessionCard({ nodesCreated: nodes.length + 1, commits: edges.length + 1 });
-    setTimeout(() => { setActiveDCId(null); setActiveDCType(null); }, 300);
+    fetch('/api/chat/dc-action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: 'JD', action, nodeId: nodes[nodes.length - 1]?.id || 'root', timestamp })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        // reload messages and graph from API to be clean
+        fetch('/api/chat/messages?student_id=JD')
+          .then(res => res.json())
+          .then(msgs => { if (Array.isArray(msgs)) setMessages(msgs); });
+        
+        fetch('/api/chat/graph?student_id=JD')
+          .then(res => res.json())
+          .then(g => {
+            if (g.nodes && g.edges) {
+              setNodes(g.nodes);
+              setEdges(g.edges);
+            }
+          });
+          
+        setSessionCard({ nodesCreated: nodes.length + 1, commits: edges.length + 1 });
+        setTimeout(() => { setActiveDCId(null); setActiveDCType(null); }, 300);
+      }
+    })
+    .catch(err => {
+      console.log('DC action API failed, using local mock', err);
+      // Execute local mock
+      const newNodeId  = `node_${Date.now()}`;
+      const newNode = {
+        id: newNodeId,
+        label: action === 'divergir' ? 'Nueva rama' : 'Convergido',
+        type: action === 'divergir' ? 'branch' : 'leaf',
+        hash: `0x${Math.floor(Math.random()*0xFFFF).toString(16).padStart(4,'0')}`,
+        module: 'synaptrac', isNew: true,
+      };
+      const lastNode = nodes[nodes.length - 1];
+      setNodes(prev => [...prev, newNode]);
+      setEdges(prev => [...prev, { source: lastNode.id, target: newNodeId, label: action }]);
+
+      const confirmMsg = {
+        id: `sys_${Date.now()}`, role: 'ai',
+        timestamp: timestamp,
+        nodeId: newNodeId,
+        text: action === 'divergir'
+          ? `Rama divergente creada. El nodo ${newNodeId.slice(-6)} fue añadido a tu grafo. Desarrolla el argumento — cada nivel de profundidad incrementa tu score académico.`
+          : `Insight convergido con la rama actual. La síntesis argumentativa fue registrada. Hash pendiente de confirmación en Axiom L2.`,
+        concepts: [],
+      };
+      setMessages(prev => [...prev, confirmMsg]);
+      setSessionCard({ nodesCreated: nodes.length + 1, commits: edges.length + 1 });
+      setTimeout(() => { setActiveDCId(null); setActiveDCType(null); }, 300);
+    });
   }, [activeDCId, activeDCType, messages, nodes, edges]);
 
   const handleSend = () => {
     if (!input.trim()) return;
-    const msg = {
-      id: `m_${Date.now()}`, role: 'student',
-      timestamp: new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    const timestamp = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    
+    // Optimistic UI updates
+    const tempId = `m_${Date.now()}`;
+    const studentMsg = {
+      id: tempId, role: 'student',
+      timestamp: timestamp,
       text: input, concepts: [],
     };
-    setMessages(prev => [...prev, msg]);
+    setMessages(prev => [...prev, studentMsg]);
     setInput('');
-    setTimeout(() => {
-      const nodeId = `n${nodes.length + 1}`;
-      const reply = {
-        id: `ai_${Date.now()}`, role: 'ai',
-        timestamp: new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        nodeId,
-        text: 'Argumento registrado. La profundidad de esta rama se incrementa con cada intervención fundamentada. ¿Quieres explorar las implicaciones cuánticas de la no-localidad o mantener el foco en relatividad especial?',
-        concepts: [{ id: `c_${Date.now()}`, label: 'No-localidad cuántica', type: 'concept' }],
-      };
-      setMessages(prev => [...prev, reply]);
-      const newNode = {
-        id: nodeId, label: input.slice(0, 8) + '…', type: 'branch',
-        hash: `0x${Math.floor(Math.random()*0xFFFF).toString(16)}`, module: 'synaptrac',
-      };
-      setNodes(prev => [...prev, newNode]);
-      setEdges(prev => [...prev, { source: prev[prev.length-1]?.target || 'root', target: nodeId, label: 'responde' }]);
-    }, 900);
+
+    fetch('/api/chat/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: 'JD', text: input, timestamp })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.ai_message) {
+        setMessages(prev => {
+          const filtered = prev.filter(m => m.id !== tempId);
+          return [...filtered, data.student_message, data.ai_message];
+        });
+        if (data.graph_node) {
+          setNodes(prev => [...prev, data.graph_node]);
+        }
+        if (data.graph_edge) {
+          setEdges(prev => [...prev, data.graph_edge]);
+        }
+      }
+    })
+    .catch(err => {
+      console.log('API Send error, using mock fallback', err);
+      setTimeout(() => {
+        const nodeId = `n${nodes.length + 1}`;
+        const reply = {
+          id: `ai_${Date.now()}`, role: 'ai',
+          timestamp: timestamp,
+          nodeId,
+          text: 'Argumento registrado (offline). La profundidad de esta rama se incrementa con cada intervención fundamentada. ¿Quieres explorar las implicaciones cuánticas de la no-localidad o mantener el foco en relatividad especial?',
+          concepts: [{ id: `c_${Date.now()}`, label: 'No-localidad cuántica (mock)', type: 'concept' }],
+        };
+        setMessages(prev => [...prev, reply]);
+        const newNode = {
+          id: nodeId, label: input.slice(0, 8) + '…', type: 'branch',
+          hash: `0x${Math.floor(Math.random()*0xFFFF).toString(16)}`, module: 'synaptrac',
+        };
+        setNodes(prev => [...prev, newNode]);
+        setEdges(prev => [...prev, { source: prev[prev.length-1]?.target || 'root', target: nodeId, label: 'responde' }]);
+      }, 900);
+    });
   };
 
   return (
