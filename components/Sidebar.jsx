@@ -1,6 +1,8 @@
 
 const { useState, useRef, useEffect } = React;
 
+const ITEM_DEPLOY = { id: 'deploy', label: 'Despliegue L2', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2v10M5 8l4 4 4-4M2 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> };
+
 const NAV_ESTUDIANTE = [
   { id: 'synaptrac', label: 'Synaptrac', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="3" fill="currentColor" opacity="0.9"/><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5" opacity="0.5"/><path d="M9 2v2M9 14v2M2 9h2M14 9h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
   { id: 'graph',     label: 'Grafo',     icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="7" y="7" width="4" height="4" fill="currentColor"/><rect x="1" y="1" width="4" height="4" fill="currentColor" opacity="0.6"/><rect x="13" y="1" width="4" height="4" fill="currentColor" opacity="0.6"/><rect x="1" y="13" width="4" height="4" fill="currentColor" opacity="0.6"/><rect x="13" y="13" width="4" height="4" fill="currentColor" opacity="0.6"/><path d="M5 3h8M3 5v8M15 5v8M5 15h8" stroke="currentColor" strokeWidth="1" opacity="0.35"/></svg> },
@@ -8,6 +10,7 @@ const NAV_ESTUDIANTE = [
   { id: 'discursus', label: 'Discursus', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="7" y="1" width="4" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3 9c0 3.3 2.7 6 6 6s6-2.7 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M9 15v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
   { id: 'axiom',     label: 'Axiom L2',  icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L16 5v8L9 17 2 13V5L9 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9 1v16M2 5l7 4 7-4M2 13l7-4 7 4" stroke="currentColor" strokeWidth="1" opacity="0.4"/></svg> },
   { id: 'achievements', label: 'Logros / Certs', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2l2.2 4.5 4.8.7-3.5 3.4.8 4.9-4.3-2.3-4.3 2.3.8-4.9-3.5-3.4 4.8-.7L9 2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+  ITEM_DEPLOY,
 ];
 const NAV_PROFESOR = [
   { id: 'professor', label: 'Estudiantes', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="5" r="3" stroke="currentColor" strokeWidth="1.5"/><path d="M5 17c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="3" cy="13" r="1.8" stroke="currentColor" strokeWidth="1.2" opacity="0.5"/><circle cx="15" cy="13" r="1.8" stroke="currentColor" strokeWidth="1.2" opacity="0.5"/></svg> },
@@ -15,12 +18,14 @@ const NAV_PROFESOR = [
   { id: 'discursus', label: 'Discursus',  icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="7" y="1" width="4" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3 9c0 3.3 2.7 6 6 6s6-2.7 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M9 15v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
   { id: 'axiom',     label: 'Axiom L2',  icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L16 5v8L9 17 2 13V5L9 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9 1v16M2 5l7 4 7-4M2 13l7-4 7 4" stroke="currentColor" strokeWidth="1" opacity="0.4"/></svg> },
   { id: 'achievements', label: 'Logros / Certs', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2l2.2 4.5 4.8.7-3.5 3.4.8 4.9-4.3-2.3-4.3 2.3.8-4.9-3.5-3.4 4.8-.7L9 2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+  ITEM_DEPLOY,
 ];
 const NAV_REVISOR = [
   { id: 'revisor', label: 'Revisión',   icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L17 5v6c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5L9 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M6 9l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> },
   { id: 'axiom',   label: 'Axiom L2',  icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L16 5v8L9 17 2 13V5L9 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9 1v16M2 5l7 4 7-4M2 13l7-4 7 4" stroke="currentColor" strokeWidth="1" opacity="0.4"/></svg> },
   { id: 'profile', label: 'Mi perfil',  icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.5"/><path d="M1 17c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
   { id: 'achievements', label: 'Logros / Certs', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2l2.2 4.5 4.8.7-3.5 3.4.8 4.9-4.3-2.3-4.3 2.3.8-4.9-3.5-3.4 4.8-.7L9 2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+  ITEM_DEPLOY,
 ];
 const NAV_INVESTIGADOR = [
   { id: 'synaptrac', label: 'Synaptrac', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="3" fill="currentColor" opacity="0.9"/><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5" opacity="0.5"/><path d="M9 2v2M9 14v2M2 9h2M14 9h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
@@ -29,18 +34,21 @@ const NAV_INVESTIGADOR = [
   { id: 'discursus', label: 'Discursus', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="7" y="1" width="4" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3 9c0 3.3 2.7 6 6 6s6-2.7 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M9 15v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
   { id: 'axiom',     label: 'Axiom L2',  icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L16 5v8L9 17 2 13V5L9 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9 1v16M2 5l7 4 7-4M2 13l7-4 7 4" stroke="currentColor" strokeWidth="1" opacity="0.4"/></svg> },
   { id: 'achievements', label: 'Logros / Certs', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2l2.2 4.5 4.8.7-3.5 3.4.8 4.9-4.3-2.3-4.3 2.3.8-4.9-3.5-3.4 4.8-.7L9 2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+  ITEM_DEPLOY,
 ];
 const NAV_LABORATORIO = [
   { id: 'kmerge',    label: 'K-Merge Lab', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="4" cy="4" r="2.5" stroke="currentColor" strokeWidth="1.5"/><circle cx="4" cy="14" r="2.5" stroke="currentColor" strokeWidth="1.5"/><circle cx="14" cy="4" r="2.5" stroke="currentColor" strokeWidth="1.5"/><path d="M4 6.5v5M4 6.5C4 10 14 10 14 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
   { id: 'discursus', label: 'Sesiones Lab', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="7" y="1" width="4" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3 9c0 3.3 2.7 6 6 6s6-2.7 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M9 15v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
   { id: 'axiom',     label: 'Axiom L2',  icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L16 5v8L9 17 2 13V5L9 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9 1v16M2 5l7 4 7-4M2 13l7-4 7 4" stroke="currentColor" strokeWidth="1" opacity="0.4"/></svg> },
   { id: 'achievements', label: 'Logros / Certs', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2l2.2 4.5 4.8.7-3.5 3.4.8 4.9-4.3-2.3-4.3 2.3.8-4.9-3.5-3.4 4.8-.7L9 2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+  ITEM_DEPLOY,
 ];
 const NAV_SPONSOR = [
   { id: 'axiom',     label: 'Explorer L2', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L16 5v8L9 17 2 13V5L9 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9 1v16M2 5l7 4 7-4M2 13l7-4 7 4" stroke="currentColor" strokeWidth="1" opacity="0.4"/></svg> },
   { id: 'discursus', label: 'Auditorías',  icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="7" y="1" width="4" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3 9c0 3.3 2.7 6 6 6s6-2.7 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M9 15v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
   { id: 'revisor',   label: 'Resultados',  icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L17 5v6c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5L9 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M6 9l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> },
   { id: 'achievements', label: 'Logros / Certs', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2l2.2 4.5 4.8.7-3.5 3.4.8 4.9-4.3-2.3-4.3 2.3.8-4.9-3.5-3.4 4.8-.7L9 2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+  ITEM_DEPLOY,
 ];
 
 const ROLE_NAV    = {

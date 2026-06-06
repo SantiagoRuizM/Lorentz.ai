@@ -19,8 +19,15 @@ function App() {
   // Web3 connection states (Monad Testnet)
   const [walletAddress, setWalletAddress] = useState(null);
   const [walletBalance, setWalletBalance] = useState('0.0000');
-  const [isWalletReal, setIsWalletReal]   = useState(false);
   const [showRainbowKitModal, setShowRainbowKitModal] = useState(false);
+
+  const [deployedAddresses, setDeployedAddresses] = useState({
+    sbc: '',
+    knowledge: '',
+    evidence: '',
+    achievement: '',
+    reputation: ''
+  });
 
   const handleLogin = (r) => {
     const chosenRole = r || 'estudiante';
@@ -35,13 +42,11 @@ function App() {
     setScreen('synaptrac');
     setWalletAddress(null);
     setWalletBalance('0.0000');
-    setIsWalletReal(false);
   };
 
-  const handleConnectWallet = (address, balance, isReal) => {
+  const handleConnectWallet = (address, balance) => {
     setWalletAddress(address);
     setWalletBalance(balance);
-    setIsWalletReal(isReal);
     // Auto log in if not logged in
     if (!loggedIn) {
       handleLogin(role);
@@ -85,7 +90,8 @@ function App() {
       case 'revisor':      return <RevisorScreen />;
       case 'axiom':        return <AxiomScreen />;
       case 'profile':      return <ProfileScreen />;
-      case 'achievements': return <AchievementsScreen role={role} walletAddress={walletAddress} walletBalance={walletBalance} setWalletBalance={setWalletBalance} />;
+      case 'achievements': return <AchievementsScreen role={role} walletAddress={walletAddress} walletBalance={walletBalance} setWalletBalance={setWalletBalance} deployedAddresses={deployedAddresses} />;
+      case 'deploy':       return <DeployScreen walletAddress={walletAddress} walletBalance={walletBalance} setWalletBalance={setWalletBalance} deployedAddresses={deployedAddresses} setDeployedAddresses={setDeployedAddresses} />;
       default:             return <SynaptracScreen />;
     }
   };

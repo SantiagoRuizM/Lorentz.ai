@@ -90,7 +90,7 @@ const ROLE_ACHIEVEMENTS = {
 
 const GAS_COST = 0.0024; // MON gas cost to mint
 
-function AchievementsScreen({ role, walletAddress, walletBalance, setWalletBalance }) {
+function AchievementsScreen({ role, walletAddress, walletBalance, setWalletBalance, deployedAddresses }) {
   const [data, setData] = useState(ROLE_ACHIEVEMENTS[role] || ROLE_ACHIEVEMENTS.estudiante);
   const [mintingCert, setMintingCert] = useState(null);
   const [signing, setSigning] = useState(false);
@@ -119,6 +119,11 @@ function AchievementsScreen({ role, walletAddress, walletBalance, setWalletBalan
       alert('Debes conectar tu billetera (RainbowKit) en el panel de login o en la barra superior para pagar el gas de acuñación en Monad Testnet.');
       return;
     }
+    const contractAddr = deployedAddresses?.sbc;
+    if (!contractAddr) {
+      alert('El contrato SoulboundCredential (SBT) no está desplegado en esta sesión. Por favor, ve a la sección de "Despliegue" y despliégalo primero en Monad Testnet para poder acuñar tu certificado.');
+      return;
+    }
     const balanceNum = parseFloat(walletBalance);
     if (balanceNum < GAS_COST) {
       alert(`Fondos insuficientes en Monad Testnet para pagar el gas.\nCosto de Gas: ${GAS_COST} MON\nTu balance: ${walletBalance} MON`);
@@ -129,22 +134,105 @@ function AchievementsScreen({ role, walletAddress, walletBalance, setWalletBalan
     setSuccessAnim(false);
   };
 
-  const handleSignAndMint = () => {
-    setSigning(true);
-    setTimeout(() => {
-      // Create random tx hash
-      const randomHash = '0x' + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+  const handleSignAndMint = async () => {
+    if (!walletAddress) {
+      alert("Billetera no conectada.");
+      return;
+    }
+    const contractAddr = deployedAddresses?.sbc;
+    if (!contractAddr) {
+      alert("El contrato SoulboundCredential (SBT) no está desplegado. Ve a la pantalla 'Despliegue' y despliégalo primero.");
+      return;
+    }
 
-      // Deduct gas from wallet balance dynamically!
-      if (walletBalance && setWalletBalance) {
-        const nextBalance = (parseFloat(walletBalance) - GAS_COST).toFixed(4);
-        setWalletBalance(nextBalance);
+    setSigning(true);
+    setSuccessAnim(false);
+
+    try {
+      const toParam = walletAddress.toLowerCase().replace('0x', '').padStart(64, '0');
+      const typeParam = '0000000000000000000000000000000000000000000000000000000000000002'; // Certification
+      const tokenIdClean = mintingCert.tokenId.replace('#', '');
+      const idParam = BigInt(tokenIdClean).toString(16).padStart(64, '0');
+      
+      // ABI encoded data for mint(address,string,uint256,uint256)
+      const txData = '0x738b5840' + 
+                     toParam + 
+                     '0000000000000000000000000000000000000000000000000000000000000080' + 
+                     typeParam + 
+                     idParam + 
+                     '000000000000000000000000000000000000000000000000000000000000000f' + // string length: 15
+                     '697066733a2f2f6d6f6e61642d6e667400000000000000000000000000000000'; // "ipfs://monad-nft" in hex
+
+      const txParams = {
+        from: walletAddress,
+        to: contractAddr,
+        data: txData
+      };
+
+      const txHash = await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [txParams]
+      });
+
+      // Poll transaction receipt
+      let receipt = null;
+      for (let i = 0; i < 30; i++) {
+        try {
+          const response = await fetch('https://testnet-rpc.monad.xyz', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'eth_getTransactionReceipt',
+              params: [txHash],
+              id: 1
+            })
+          });
+          const rpcData = await response.json();
+          if (rpcData.result) {
+            receipt = rpcData.result;
+            break;
+          }
+        } catch (pollErr) {
+          console.error("Error polling receipt:", pollErr);
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
+      if (!receipt) {
+        throw new Error("La transacción tardó demasiado en confirmarse o falló. TxHash: " + txHash);
+      }
+
+      // Fetch updated balance from Monad Testnet RPC
+      let newBalance = walletBalance;
+      try {
+        const response = await fetch('https://testnet-rpc.monad.xyz', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'eth_getBalance',
+            params: [walletAddress, 'latest'],
+            id: 1
+          })
+        });
+        const rpcData = await response.json();
+        if (rpcData.result) {
+          const wei = BigInt(rpcData.result);
+          newBalance = (Number(wei) / 1e18).toFixed(4);
+        }
+      } catch (balErr) {
+        console.error("Error updating balance:", balErr);
+      }
+
+      if (setWalletBalance) {
+        setWalletBalance(newBalance);
       }
 
       // Update certificate status locally
       const updatedCerts = data.certs.map(c => {
         if (c.id === mintingCert.id) {
-          return { ...c, status: 'minted', hash: randomHash };
+          return { ...c, status: 'minted', hash: txHash };
         }
         return c;
       });
@@ -152,7 +240,7 @@ function AchievementsScreen({ role, walletAddress, walletBalance, setWalletBalan
       setData(prev => ({
         ...prev,
         certs: updatedCerts,
-        monEarned: prev.monEarned + 10.0 // Give them some MON rewards for unlocking the NFT!
+        monEarned: prev.monEarned + 10.0
       }));
 
       setSigning(false);
@@ -161,8 +249,14 @@ function AchievementsScreen({ role, walletAddress, walletBalance, setWalletBalan
       setTimeout(() => {
         setMintingCert(null);
         setSuccessAnim(false);
-      }, 2000);
-    }, 1800);
+      }, 2500);
+
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Error al acuñar el certificado.");
+      setSigning(false);
+      setMintingCert(null);
+    }
   };
 
   return (
@@ -332,7 +426,10 @@ function AchievementsScreen({ role, walletAddress, walletBalance, setWalletBalan
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, background: 'rgba(0,0,0,0.15)', padding: '8px 12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontFamily: 'JetBrains Mono' }}>
                       <span style={{ color: 'var(--text-dim)' }}>Contrato:</span>
-                      <span style={{ color: 'var(--text-muted)' }}>{cert.contract.slice(0, 6)}...{cert.contract.slice(-4)}</span>
+                      {(() => {
+                        const cAddress = deployedAddresses?.sbc || cert.contract;
+                        return <span style={{ color: 'var(--text-muted)' }}>{cAddress.slice(0, 6)}...{cAddress.slice(-4)}</span>;
+                      })()}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontFamily: 'JetBrains Mono' }}>
                       <span style={{ color: 'var(--text-dim)' }}>Red:</span>
