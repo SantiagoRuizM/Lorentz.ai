@@ -215,9 +215,35 @@ const RoleIcons = {
       <path d="M8 11l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   ),
+  investigador: (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <circle cx="11" cy="11" r="3" stroke="currentColor" strokeWidth="1.5"/>
+      <ellipse cx="11" cy="11" rx="10" ry="4" transform="rotate(30 11 11)" stroke="currentColor" strokeWidth="1.5" opacity="0.7"/>
+      <ellipse cx="11" cy="11" rx="10" ry="4" transform="rotate(-30 11 11)" stroke="currentColor" strokeWidth="1.5" opacity="0.7"/>
+    </svg>
+  ),
+  laboratorio: (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path d="M8 3h6M9 3v5l-4.5 9A1.5 1.5 0 005.8 19h10.4a1.5 1.5 0 001.3-2l-4.5-9V3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M7.5 14h7" stroke="currentColor" strokeWidth="1.2" opacity="0.6"/>
+    </svg>
+  ),
+  sponsor: (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <path d="M6 3h10l4.5 5.5-9.5 10.5-9.5-10.5L6 3z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M2.5 8.5h17M6 3l4.5 5.5 1 10M16 3l-4.5 5.5-1 10" stroke="currentColor" strokeWidth="1" opacity="0.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
 };
 
-const ROLE_BG = { estudiante: 'var(--violet)', profesor: '#3D6BF5', revisor: '#2E4F9B' };
+const ROLE_BG = {
+  estudiante: 'var(--violet)',
+  profesor: '#3D6BF5',
+  revisor: '#2E4F9B',
+  investigador: '#00D8F6',
+  laboratorio: '#00E676',
+  sponsor: '#FFB300',
+};
 
 // ── Role selector (single, no duplicate) ─────────────────────────
 function RoleSelector({ selected, onSelect }) {
@@ -225,27 +251,42 @@ function RoleSelector({ selected, onSelect }) {
     { id: 'estudiante', label: 'Estudiante', desc: 'Debate con IA · grafo de conocimiento' },
     { id: 'profesor',   label: 'Profesor',   desc: 'Audita el proceso cognitivo' },
     { id: 'revisor',    label: 'Revisor',    desc: 'Verifica hashes · Axiom L2' },
+    { id: 'investigador', label: 'Investigador', desc: 'Analiza grafos · K-Merge' },
+    { id: 'laboratorio',  label: 'Laboratorio',  desc: 'Control de datos · docs' },
+    { id: 'sponsor',      label: 'Sponsor',      desc: 'Valida valor · financiación' },
   ];
   const idx = roles.findIndex(r => r.id === selected);
+  const row = Math.floor(idx / 3);
+  const col = idx % 3;
 
   return (
     <div>
       <label style={{ display: 'block', fontSize: 10, fontFamily: 'JetBrains Mono', color: 'var(--text-dim)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>
         ROL DE ACCESO
       </label>
-      <div style={{ position: 'relative', display: 'flex', background: 'var(--slate)', border: '1px solid var(--border)', padding: 4, gap: 3 }}>
+      <div style={{
+        position: 'relative',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        background: 'var(--slate)',
+        border: '1px solid var(--border)',
+        padding: 4,
+        gap: 3
+      }}>
         {/* Sliding highlight */}
         <div style={{
-          position: 'absolute', zIndex: 0, top: 4, bottom: 4,
-          left: `calc(${idx * (100 / 3)}% + 4px)`,
+          position: 'absolute', zIndex: 0,
+          top: `calc(${row * 50}% + 4px)`,
+          left: `calc(${col * (100 / 3)}% + 4px)`,
           width: `calc(${100 / 3}% - ${16 / 3}px)`,
+          height: 'calc(50% - 8px)',
           background: ROLE_BG[selected] || 'var(--violet)',
-          transition: 'left 260ms cubic-bezier(0.25,0,0.35,1), background 260ms ease',
+          transition: 'left 260ms cubic-bezier(0.25,0,0.35,1), top 260ms cubic-bezier(0.25,0,0.35,1), background 260ms ease',
           boxShadow: `0 0 14px ${ROLE_BG[selected] || 'var(--violet)'}66`,
         }} />
         {roles.map(role => (
           <button key={role.id} onClick={() => onSelect(role.id)} style={{
-            flex: 1, zIndex: 1, position: 'relative', padding: '11px 5px',
+            zIndex: 1, position: 'relative', padding: '11px 5px',
             background: 'transparent', border: 'none', cursor: 'pointer',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
             color: selected === role.id ? 'white' : 'var(--text-dim)',
@@ -326,7 +367,14 @@ function LoginForm({ role, onRoleChange, onLogin, onGoRegister, onGoForgot }) {
     setTimeout(() => { setLoading(false); onLogin(role); }, 1100);
   };
 
-  const roleLabel = { estudiante: 'Estudiante', profesor: 'Profesor', revisor: 'Revisor' }[role];
+  const roleLabel = {
+    estudiante: 'Estudiante',
+    profesor: 'Profesor',
+    revisor: 'Revisor',
+    investigador: 'Investigador',
+    laboratorio: 'Laboratorio',
+    sponsor: 'Sponsor',
+  }[role] || 'Estudiante';
 
   return (
     <div style={{ width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', gap: 14 }}>

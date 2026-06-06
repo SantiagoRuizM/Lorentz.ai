@@ -21,9 +21,50 @@ const NAV_REVISOR = [
   { id: 'profile', label: 'Mi perfil',  icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.5"/><path d="M1 17c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
 ];
 
-const ROLE_NAV    = { estudiante: NAV_ESTUDIANTE, profesor: NAV_PROFESOR, revisor: NAV_REVISOR };
-const ROLE_LABELS = { estudiante: 'Estudiante', profesor: 'Profesor', revisor: 'Revisor' };
-const ROLE_COLORS = { estudiante: 'var(--violet)', profesor: '#3D6BF5', revisor: '#2E4F9B' };
+const NAV_INVESTIGADOR = [
+  { id: 'synaptrac', label: 'Synaptrac', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="3" fill="currentColor" opacity="0.9"/><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5" opacity="0.5"/><path d="M9 2v2M9 14v2M2 9h2M14 9h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
+  { id: 'graph',     label: 'Grafo Ciencia', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="7" y="7" width="4" height="4" fill="currentColor"/><rect x="1" y="1" width="4" height="4" fill="currentColor" opacity="0.6"/><rect x="13" y="1" width="4" height="4" fill="currentColor" opacity="0.6"/><rect x="1" y="13" width="4" height="4" fill="currentColor" opacity="0.6"/><rect x="13" y="13" width="4" height="4" fill="currentColor" opacity="0.6"/><path d="M5 3h8M3 5v8M15 5v8M5 15h8" stroke="currentColor" strokeWidth="1" opacity="0.35"/></svg> },
+  { id: 'kmerge',    label: 'K-Merge Docs', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="4" cy="4" r="2.5" stroke="currentColor" strokeWidth="1.5"/><circle cx="4" cy="14" r="2.5" stroke="currentColor" strokeWidth="1.5"/><circle cx="14" cy="4" r="2.5" stroke="currentColor" strokeWidth="1.5"/><path d="M4 6.5v5M4 6.5C4 10 14 10 14 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
+  { id: 'discursus', label: 'Discursus', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="7" y="1" width="4" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3 9c0 3.3 2.7 6 6 6s6-2.7 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M9 15v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
+  { id: 'axiom',     label: 'Axiom L2',  icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L16 5v8L9 17 2 13V5L9 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9 1v16M2 5l7 4 7-4M2 13l7-4 7 4" stroke="currentColor" strokeWidth="1" opacity="0.4"/></svg> },
+];
+
+const NAV_LABORATORIO = [
+  { id: 'kmerge',    label: 'K-Merge Lab', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="4" cy="4" r="2.5" stroke="currentColor" strokeWidth="1.5"/><circle cx="4" cy="14" r="2.5" stroke="currentColor" strokeWidth="1.5"/><circle cx="14" cy="4" r="2.5" stroke="currentColor" strokeWidth="1.5"/><path d="M4 6.5v5M4 6.5C4 10 14 10 14 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
+  { id: 'discursus', label: 'Sesiones Lab', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="7" y="1" width="4" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3 9c0 3.3 2.7 6 6 6s6-2.7 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M9 15v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
+  { id: 'axiom',     label: 'Axiom L2',  icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L16 5v8L9 17 2 13V5L9 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9 1v16M2 5l7 4 7-4M2 13l7-4 7 4" stroke="currentColor" strokeWidth="1" opacity="0.4"/></svg> },
+];
+
+const NAV_SPONSOR = [
+  { id: 'axiom',     label: 'Explorer L2', icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L16 5v8L9 17 2 13V5L9 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M9 1v16M2 5l7 4 7-4M2 13l7-4 7 4" stroke="currentColor" strokeWidth="1" opacity="0.4"/></svg> },
+  { id: 'discursus', label: 'Auditorías',  icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="7" y="1" width="4" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3 9c0 3.3 2.7 6 6 6s6-2.7 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M9 15v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
+  { id: 'revisor',   label: 'Resultados',  icon: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L17 5v6c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5L9 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><path d="M6 9l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> },
+];
+
+const ROLE_NAV    = {
+  estudiante: NAV_ESTUDIANTE,
+  profesor: NAV_PROFESOR,
+  revisor: NAV_REVISOR,
+  investigador: NAV_INVESTIGADOR,
+  laboratorio: NAV_LABORATORIO,
+  sponsor: NAV_SPONSOR,
+};
+const ROLE_LABELS = {
+  estudiante: 'Estudiante',
+  profesor: 'Profesor',
+  revisor: 'Revisor',
+  investigador: 'Investigador',
+  laboratorio: 'Laboratorio',
+  sponsor: 'Sponsor',
+};
+const ROLE_COLORS = {
+  estudiante: 'var(--violet)',
+  profesor: '#3D6BF5',
+  revisor: '#2E4F9B',
+  investigador: '#00D8F6',
+  laboratorio: '#00E676',
+  sponsor: '#FFB300',
+};
 
 function NavItem({ item, active, expanded, onClick }) {
   const [hov, setHov] = useState(false);

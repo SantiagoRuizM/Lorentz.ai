@@ -3,9 +3,12 @@
 const { useState } = React;
 
 const DEFAULT_SCREEN = {
-  estudiante: 'synaptrac',
-  profesor:   'professor',
-  revisor:    'revisor',
+  estudiante:   'synaptrac',
+  profesor:     'professor',
+  revisor:      'revisor',
+  investigador: 'synaptrac',
+  laboratorio:  'kmerge',
+  sponsor:      'axiom',
 };
 
 function App() {
