@@ -109,11 +109,15 @@ function NotificationDropdown({ notifications, onMarkRead, onClose }) {
   );
 }
 
-function Topbar({ screen }) {
+function Topbar({ screen, walletAddress, walletBalance, onOpenWalletModal, onDisconnectWallet }) {
   const info = SCREEN_LABELS[screen] || SCREEN_LABELS.synaptrac;
   const [notifOpen, setNotifOpen]   = useState(false);
   const [notifs, setNotifs]         = useState(NOTIFICATIONS);
   const notifRef = useRef(null);
+
+  const [walletMenuOpen, setWalletMenuOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const walletMenuRef = useRef(null);
 
   const unread = notifs.filter(n => !n.read).length;
 
@@ -124,6 +128,22 @@ function Topbar({ screen }) {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (walletMenuRef.current && !walletMenuRef.current.contains(e.target)) setWalletMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleCopy = () => {
+    if (walletAddress) {
+      navigator.clipboard.writeText(walletAddress);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const markAllRead = () => setNotifs(prev => prev.map(n => ({ ...n, read: true })));
 
@@ -151,6 +171,109 @@ function Topbar({ screen }) {
 
         {/* Block counter */}
         <BlockCounter />
+
+        {/* Web3 Wallet Connect Button (RainbowKit style) */}
+        <div style={{ position: 'relative' }}>
+          {walletAddress ? (
+            <>
+              <button
+                onClick={() => setWalletMenuOpen(o => !o)}
+                style={{
+                  display: 'flex', alignItems: 'center', background: 'var(--slate)', border: '1px solid var(--border)',
+                  borderRadius: '2px', cursor: 'pointer', padding: 0, overflow: 'hidden', color: 'var(--text)'
+                }}
+              >
+                <span style={{ background: 'var(--violet-10)', borderRight: '1px solid var(--border)', padding: '5px 8px', fontSize: 11, fontWeight: 700, color: 'var(--success)' }}>
+                  {walletBalance} MON
+                </span>
+                <span style={{ padding: '5px 8px', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)' }} />
+                  {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                </span>
+              </button>
+
+              {walletMenuOpen && (
+                <div
+                  ref={walletMenuRef}
+                  style={{
+                    position: 'absolute', top: '100%', right: 0, marginTop: 6,
+                    width: 260, background: 'var(--card)', border: '1px solid var(--border)',
+                    boxShadow: '0 12px 40px rgba(0,0,0,0.6), 4px 4px 0 var(--violet-deep)',
+                    zIndex: 200, padding: 14, display: 'flex', flexDirection: 'column', gap: 10,
+                    animation: 'fadeUp 0.15s cubic-bezier(0.25,0,0.35,1)'
+                  }}
+                >
+                  <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)' }} />
+                      <span style={{ fontSize: 9, fontFamily: 'JetBrains Mono', color: 'var(--success)', letterSpacing: '0.05em' }}>MONAD TESTNET (10143)</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', wordBreak: 'break-all', lineHeight: 1.3 }}>
+                      {walletAddress}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleCopy}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, background: 'var(--deep)', border: '1px solid var(--border)',
+                      borderRadius: '2px', padding: '8px 12px', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer',
+                      textAlign: 'left', fontFamily: 'JetBrains Mono', transition: 'all 150ms'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--text-dim)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+                  >
+                    {copied ? '✓ Copiado!' : '❐ Copiar Dirección'}
+                  </button>
+
+                  <a
+                    href={`https://testnet.monadexplorer.com/address/${walletAddress}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, background: 'var(--deep)', border: '1px solid var(--border)',
+                      borderRadius: '2px', padding: '8px 12px', color: 'var(--text-muted)', fontSize: 11, textDecoration: 'none',
+                      fontFamily: 'JetBrains Mono', transition: 'all 150ms'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.borderColor = 'var(--text-dim)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+                  >
+                    ↗ Ver en Explorer
+                  </a>
+
+                  <button
+                    onClick={() => { onDisconnectWallet(); setWalletMenuOpen(false); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', border: '1px solid var(--error)',
+                      borderRadius: '2px', padding: '8px 12px', color: 'var(--error)', fontSize: 11, cursor: 'pointer',
+                      textAlign: 'left', fontFamily: 'JetBrains Mono', transition: 'all 150ms', fontWeight: 700
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,92,92,0.08)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    ✕ Desconectar Billetera
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <button
+              onClick={onOpenWalletModal}
+              style={{
+                display: 'flex', alignItems: 'center', padding: '6px 14px', background: 'var(--violet)', border: 'none',
+                borderRadius: '2px', color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                boxShadow: '0 4px 10px rgba(110,84,255,0.3)', transition: 'all 150ms'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--violet-deep)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--violet)'; }}
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ marginRight: 6 }} stroke="currentColor">
+                <path d="M1 4h14v9a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4zm11 3v2h2V7h-2z" strokeWidth="1.5"/>
+              </svg>
+              Conectar Wallet
+            </button>
+          )}
+        </div>
 
         {/* Notifications */}
         <div ref={notifRef} style={{ position: 'relative' }}>

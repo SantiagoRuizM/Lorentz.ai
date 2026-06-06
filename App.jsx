@@ -16,6 +16,12 @@ function App() {
   const [role, setRole]         = useState('estudiante');
   const [screen, setScreen]     = useState('synaptrac');
 
+  // Web3 connection states (Monad Testnet)
+  const [walletAddress, setWalletAddress] = useState(null);
+  const [walletBalance, setWalletBalance] = useState('0.0000');
+  const [isWalletReal, setIsWalletReal]   = useState(false);
+  const [showRainbowKitModal, setShowRainbowKitModal] = useState(false);
+
   const handleLogin = (r) => {
     const chosenRole = r || 'estudiante';
     setRole(chosenRole);
@@ -27,23 +33,60 @@ function App() {
     setLoggedIn(false);
     setRole('estudiante');
     setScreen('synaptrac');
+    setWalletAddress(null);
+    setWalletBalance('0.0000');
+    setIsWalletReal(false);
+  };
+
+  const handleConnectWallet = (address, balance, isReal) => {
+    setWalletAddress(address);
+    setWalletBalance(balance);
+    setIsWalletReal(isReal);
+    // Auto log in if not logged in
+    if (!loggedIn) {
+      handleLogin(role);
+    }
+  };
+
+  const handleDisconnectWallet = () => {
+    setWalletAddress(null);
+    setWalletBalance('0.0000');
+    setIsWalletReal(false);
   };
 
   if (!loggedIn) {
-    return <LoginScreen onLogin={handleLogin} />;
+    return (
+      <>
+        <LoginScreen
+          onLogin={handleLogin}
+          role={role}
+          setRole={setRole}
+          walletAddress={walletAddress}
+          walletBalance={walletBalance}
+          onOpenWalletModal={() => setShowRainbowKitModal(true)}
+        />
+        {showRainbowKitModal && (
+          <RainbowKitModal
+            onClose={() => setShowRainbowKitModal(false)}
+            onConnect={handleConnectWallet}
+          />
+        )}
+      </>
+    );
   }
 
   const renderScreen = () => {
     switch (screen) {
-      case 'synaptrac':  return <SynaptracScreen />;
-      case 'graph':      return <GraphScreen />;
-      case 'kmerge':     return <KMergeScreen />;
-      case 'discursus':  return <DiscursusScreen />;
-      case 'professor':  return <ProfessorScreen />;
-      case 'revisor':    return <RevisorScreen />;
-      case 'axiom':      return <AxiomScreen />;
-      case 'profile':    return <ProfileScreen />;
-      default:           return <SynaptracScreen />;
+      case 'synaptrac':    return <SynaptracScreen />;
+      case 'graph':        return <GraphScreen />;
+      case 'kmerge':       return <KMergeScreen />;
+      case 'discursus':    return <DiscursusScreen />;
+      case 'professor':    return <ProfessorScreen />;
+      case 'revisor':      return <RevisorScreen />;
+      case 'axiom':        return <AxiomScreen />;
+      case 'profile':      return <ProfileScreen />;
+      case 'achievements': return <AchievementsScreen role={role} walletAddress={walletAddress} walletBalance={walletBalance} setWalletBalance={setWalletBalance} />;
+      default:             return <SynaptracScreen />;
     }
   };
 
@@ -54,13 +97,26 @@ function App() {
         setScreen={setScreen}
         role={role}
         onLogout={handleLogout}
+        walletAddress={walletAddress}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        <Topbar screen={screen} />
+        <Topbar
+          screen={screen}
+          walletAddress={walletAddress}
+          walletBalance={walletBalance}
+          onOpenWalletModal={() => setShowRainbowKitModal(true)}
+          onDisconnectWallet={handleDisconnectWallet}
+        />
         <div style={{ flex: 1, overflow: 'hidden' }}>
           {renderScreen()}
         </div>
       </div>
+      {showRainbowKitModal && (
+        <RainbowKitModal
+          onClose={() => setShowRainbowKitModal(false)}
+          onConnect={handleConnectWallet}
+        />
+      )}
     </div>
   );
 }

@@ -355,7 +355,7 @@ function PrimaryBtn({ children, onClick, loading }) {
 }
 
 // ── Login form — SINGLE role selector, no duplicate ───────────────
-function LoginForm({ role, onRoleChange, onLogin, onGoRegister, onGoForgot }) {
+function LoginForm({ role, onRoleChange, onLogin, onGoRegister, onGoForgot, onOpenWalletModal }) {
   const [email, setEmail]     = useState('');
   const [pass, setPass]       = useState('');
   const [loading, setLoading] = useState(false);
@@ -393,6 +393,26 @@ function LoginForm({ role, onRoleChange, onLogin, onGoRegister, onGoForgot }) {
 
       {/* Single role selector */}
       <RoleSelector selected={role} onSelect={onRoleChange} />
+
+      {/* Web3 Wallet Connect Button (RainbowKit style) */}
+      <button
+        onClick={onOpenWalletModal}
+        style={{
+          width: '100%', padding: '11px',
+          background: 'linear-gradient(135deg, var(--violet-deep), #9B8AFF)',
+          border: 'none', borderRadius: '2px', color: 'white', fontSize: 13,
+          fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', gap: 10, transition: 'all 200ms ease',
+          boxShadow: '0 4px 15px rgba(110,84,255,0.35)'
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(110,84,255,0.5)'; }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(110,84,255,0.35)'; }}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M1 4h14v9a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4zm11 3v2h2V7h-2z"/>
+        </svg>
+        Conectar Billetera (RainbowKit)
+      </button>
 
       {/* Google */}
       <button style={{
@@ -458,9 +478,8 @@ function ForgotForm({ onBack }) {
 }
 
 // ── Main login screen ─────────────────────────────────────────────
-function LoginScreen({ onLogin }) {
+function LoginScreen({ onLogin, role, setRole, walletAddress, walletBalance, onOpenWalletModal }) {
   const [view, setView] = useState('login');
-  const [role, setRole] = useState('estudiante');
 
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', background: 'var(--void)', zIndex: 100, overflow: 'hidden' }}>
@@ -484,7 +503,7 @@ function LoginScreen({ onLogin }) {
         </div>
       </div>
 
-      {/* Right: form — NO duplicate role selector */}
+      {/* Right: form ── NO duplicate role selector */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'var(--s5)', overflowY: 'auto' }}>
         {view === 'login' && (
           <LoginForm
@@ -493,6 +512,7 @@ function LoginScreen({ onLogin }) {
             onLogin={r => onLogin(r || role)}
             onGoRegister={() => setView('register')}
             onGoForgot={() => setView('forgot')}
+            onOpenWalletModal={onOpenWalletModal}
           />
         )}
         {view === 'register' && <RegisterForm role={role} onDone={r => onLogin(r || role)} onBack={() => setView('login')} />}
