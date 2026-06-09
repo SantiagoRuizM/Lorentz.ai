@@ -4,6 +4,37 @@
 
 > *The open protocol for human knowledge — decentralized, AI-native, and unstoppable.*
 
+
+🚀 *Built for Monad Blitz Medellín*
+
+## 📋 Hackathon Official Submission
+* *Team Name:* Lorentz.ai
+* *Demo:* lorentz-ai.daturoma.com 
+* *Video:* https://drive.google.com/file/d/1OKPGfyQaHyHB00086VW4oQZ-xxWHlAKb/view?usp=drive_link
+* *Monad Testnet Smart Contracts:* 
+  * SoulboundCredential: 0xf593db23ffd56dc9a753b0a40ee962de59ad0512
+  * KnowledgeRegistry: 0x84e5f7979b77d2d46bf09bbc6bac71922cad285f
+  * EvidenceRegistry: 0x3b66cb96eac206850e5d41d226c2f890fcc078e5
+  * AchievementRegistry: 0x59b2765aa42873a5286565856f909ecca1a52a26
+  * ReputationEngine: 0xca8352a8430a77cdfa2125fc1d53d6b3d1ef3c21
+
+---
+
+## 📖 What is Lorentz.ai?
+Education has not fundamentally changed in a century. Lorentz.ai is not an EdTech app; it is a *decentralized education protocol*. We cut out the institutional gatekeepers (universities) and connect students, professors, researchers, and companies directly via on-chain interactions and AI-driven tutoring.
+
+*Traditional Model:* Student → University (slow/expensive) → Employer
+*Lorentz.ai:* Student ⟷ Socratic AI ⟷ Professor ⟷ Company (on-chain, real-time)
+
+## 🛠️ Core Technology & Architecture
+Built for speed and immutability using the Monad ecosystem:
+
+* *Blockchain (Monad L1):* Every academic achievement and knowledge milestone is cryptographically recorded leveraging Monad's 10,000+ TPS and sub-cent transactions.
+* *AI-Native Knowledge Engine:* A Socratic AI tutor maps the student's thinking, generating a living knowledge graph.
+* *Smart Contracts:* Solidity-based registries deployed on Monad Testnet for reputation tokens, verifiable credentials, and evidence tracking.
+* *Frontend:* React/Next.js progressive web architecture optimized for emerging market bandwidth.
+
+
 ---
 
 ## The Problem: 100 Years of Institutional Failure
