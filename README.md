@@ -9,7 +9,7 @@
 
 ## 📋 Hackathon Official Submission
 * *Team Name:* Lorentz.ai
-* *Demo:* lorentz-ai.daturoma.com 
+* *Demo:* https://lorentz-ai.daturoma.com 
 * *Video:* https://drive.google.com/file/d/1OKPGfyQaHyHB00086VW4oQZ-xxWHlAKb/view?usp=drive_link
 * *Monad Testnet Smart Contracts:* 
   * SoulboundCredential: 0xf593db23ffd56dc9a753b0a40ee962de59ad0512
